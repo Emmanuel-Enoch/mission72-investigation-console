@@ -7,7 +7,7 @@ An offline cybersecurity authentication log analysis and incident triage platfor
 
 ## Current Status: Mission 02 Context-Aware Implementation Complete
 
-The project is fully implemented, strictly deterministic, air-gapped capable, and validated with **59 passing automated tests** across all 13 challenge scenarios:
+The project is fully implemented, strictly deterministic, air-gapped capable, and validated with **62 passing automated tests** across all 13 challenge scenarios:
 
 1. **Context Policy Engine (`src/mission72/context.py` & `config/context_config.json`):**
    - **Declared IT Maintenance Windows:** Supports start/end timestamps (strict UTC ISO-8601 normalization), exact boundary matching (`start <= ts <= end`), scoped target host globbing (`srv-patch-*`), permitted activity types (`AUTHENTICATION`, `ADMIN_LOGON`), and authorized account/role permissions. Inverted or zero-duration windows are rejected at configuration time.
@@ -33,9 +33,10 @@ The project is fully implemented, strictly deterministic, air-gapped capable, an
      - Scope Violations / Mismatches: $0$ points discount (preserves full suspicious indicators).
 
 4. **Investigator Interface & Reporting (`src/mission72/reporting.py`, `src/mission72/server.py`):**
-   - **Interactive Local Dashboard:** Clean dark-mode UI with summary metrics, dynamic filtering, contextual policy status badges (`APPROVED_MAINTENANCE`, `VERIFIED_VPN`, `APPROVAL_MISMATCH`), expandable score breakdowns, and raw evidence tables.
-   - **CSV Exports:** Exports `incidents.csv`, `evidence.csv`, and `user_risk_profiles.csv`.
+   - **Interactive Local & Cloud Dashboard:** Clean dark-mode UI with summary metrics, dynamic filtering, contextual policy status badges (`APPROVED_MAINTENANCE`, `VERIFIED_VPN`, `APPROVAL_MISMATCH`), expandable score breakdowns, and raw evidence tables.
+   - **CSV Exports:** Exports `incidents.csv`, `evidence.csv`, and `user_risk_profiles.csv` via in-memory streaming with zero temporary disk writes.
    - **HTML Report:** Self-contained, printable single-file HTML report with contextual badges and evidence audits.
+   - **Dual Cloud Ready:** Native support for persistent hosts (Render / Railway via `render.yaml` & `Procfile`) and serverless functions (Vercel via `vercel.json` & `api/index.py`).
 
 ---
 
@@ -67,6 +68,11 @@ All 13 required scenarios are covered by deterministic tests in `tests/test_miss
 Missionathon/
 ├── main.py                                  # Root execution entrypoint
 ├── README.md                                # Project documentation & scenario matrix
+├── vercel.json                              # Vercel serverless routing configuration
+├── render.yaml                              # Render Web Service blueprint
+├── Procfile                                 # Process file for cloud container deployment
+├── api/
+│   └── index.py                             # Vercel serverless function entrypoint (handler)
 ├── config/
 │   ├── default_rules.yaml                   # Rule parameters and detection thresholds
 │   └── context_config.json                  # Maintenance windows, account roles, and VPN endpoints
@@ -89,15 +95,15 @@ Missionathon/
 │       ├── baseline.py                      # Leak-free training baseline profiler & coverage engine
 │       ├── detections.py                    # All six detection rules with context awareness
 │       ├── incidents.py                     # Incident clustering & explainable [0, 100] risk scoring
-│       ├── reporting.py                     # Standalone HTML dashboard and CSV exporters
-│       ├── server.py                        # Python 3.13-compatible local web dashboard (http.server)
+│       ├── reporting.py                     # Standalone HTML dashboard and in-memory CSV exporters
+│       ├── server.py                        # Python 3.13-compatible local & cloud web dashboard
 │       ├── cli.py                           # CLI entrypoint for analysis and server commands
 │       └── synthetic.py                     # Deterministic synthetic data generator with active seed
 └── tests/
     ├── __init__.py
     ├── test_stage1.py                       # 16 ingestion, baseline & quality regression tests
     ├── test_mvp.py                          # 20 rule, scoring, grouping, and end-to-end tests
-    ├── test_server.py                       # 10 server HTTP, Python 3.13 multipart & regression tests
+    ├── test_server.py                       # 13 server HTTP, multipart & cloud/serverless tests
     └── test_mission02_context.py            # 13 deterministic tests covering Mission 02 scenarios
 ```
 
@@ -200,7 +206,7 @@ Incident risk scores ($0 \le \text{Score} \le 100$) are calculated deterministic
 
 ## Execution Instructions
 
-### 1. Run Complete Automated Test Suite (59 Tests)
+### 1. Run Complete Automated Test Suite (62 Tests)
 
 ```powershell
 $env:PYTHONPATH = "src"
@@ -225,7 +231,7 @@ python main.py analyze `
 
 ```powershell
 $env:PYTHONPATH = "src"
-python main.py serve --port 8072
+python main.py serve --host 127.0.0.1 --port 8072
 ```
 
 Navigate to `http://127.0.0.1:8072` in any browser:
@@ -233,6 +239,25 @@ Navigate to `http://127.0.0.1:8072` in any browser:
 - Click **"Load Synthetic Benchmark"** to test immediately.
 - Inspect contextual badges (`APPROVED_MAINTENANCE`, `VERIFIED_VPN`, `APPROVAL_MISMATCH`) in the incident detail panel.
 - Export correlated incident, evidence, user profile CSVs, or standalone HTML reports.
+
+---
+
+## Cloud Deployment (Vercel & Render)
+
+The project includes dual native deployment support for both serverless and persistent cloud container hosting:
+
+### Option A: Vercel Serverless Function Deployment
+- **Files:** `vercel.json` (URL routing rewrite to `/api/index`), `api/index.py` (Vercel Python runtime entrypoint).
+- **Auto-Preload:** Automatically detects the `VERCEL` environment variable and auto-populates synthetic benchmark data so judges and visitors immediately see the full interactive investigation dashboard.
+- **Vercel Deployment Protection (Crucial):** If Vercel displays a login/SSO redirect screen, disable Deployment Protection for public judge access:
+  1. Open the project on [Vercel Dashboard](https://vercel.com).
+  2. Navigate to **Settings** $\to$ **Deployment Protection**.
+  3. Under **Vercel Authentication**, toggle it to **Disabled**.
+
+### Option B: Render / Persistent Container Deployment (Recommended for Full Session State)
+- **Files:** `render.yaml` (Render Infrastructure-as-Code Blueprint), `Procfile` (`web: python main.py serve --host 0.0.0.0`).
+- **Persistent State:** Long-running `ThreadingHTTPServer` preserves `GLOBAL_STATE` in memory across page refreshes and uploads with zero cold starts and no authentication walls.
+- **Port Binding:** Automatically binds to `$PORT` passed by Render, Heroku, or Railway.
 
 ---
 

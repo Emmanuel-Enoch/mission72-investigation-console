@@ -6,6 +6,7 @@ offline HTML investigation dashboard with filtering and collapsible evidence row
 
 import csv
 import html
+import io
 import json
 from pathlib import Path
 from typing import Dict, List, Optional, Union
@@ -14,11 +15,8 @@ from mission72.incidents import Incident, UserRiskProfile
 from mission72.models import DataQualityReport
 
 
-def export_incidents_to_csv(incidents: List[Incident], file_path: Union[str, Path]) -> None:
-    """Exports summary of security incidents to CSV."""
-    path = Path(file_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-
+def generate_incidents_csv(incidents: List[Incident]) -> str:
+    """Generates summary of security incidents as an in-memory CSV string."""
     fieldnames = [
         "incident_id",
         "title",
@@ -40,37 +38,44 @@ def export_incidents_to_csv(incidents: List[Incident], file_path: Union[str, Pat
         "context_summary",
     ]
 
-    with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for inc in incidents:
-            writer.writerow({
-                "incident_id": inc.incident_id,
-                "title": inc.title,
-                "primary_entity": inc.primary_entity,
-                "severity": inc.severity,
-                "risk_score": inc.risk_score,
-                "risk_explanation": inc.risk_explanation,
-                "rule_ids": "; ".join(inc.rule_ids),
-                "categories": "; ".join(inc.categories),
-                "alert_count": len(inc.alerts),
-                "evidence_count": len(inc.evidence_records),
-                "start_time_utc": inc.start_time_utc.isoformat(),
-                "end_time_utc": inc.end_time_utc.isoformat(),
-                "source_ips": "; ".join(inc.source_ips),
-                "destination_hosts": "; ".join(inc.destination_hosts),
-                "triage_summary": inc.triage_summary,
-                "recommended_action": inc.recommended_action,
-                "context_status": getattr(inc, "context_status", "NORMAL_EVALUATION"),
-                "context_summary": getattr(inc, "context_summary", ""),
-            })
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    for inc in incidents:
+        writer.writerow({
+            "incident_id": inc.incident_id,
+            "title": inc.title,
+            "primary_entity": inc.primary_entity,
+            "severity": inc.severity,
+            "risk_score": inc.risk_score,
+            "risk_explanation": inc.risk_explanation,
+            "rule_ids": "; ".join(inc.rule_ids),
+            "categories": "; ".join(inc.categories),
+            "alert_count": len(inc.alerts),
+            "evidence_count": len(inc.evidence_records),
+            "start_time_utc": inc.start_time_utc.isoformat(),
+            "end_time_utc": inc.end_time_utc.isoformat(),
+            "source_ips": "; ".join(inc.source_ips),
+            "destination_hosts": "; ".join(inc.destination_hosts),
+            "triage_summary": inc.triage_summary,
+            "recommended_action": inc.recommended_action,
+            "context_status": getattr(inc, "context_status", "NORMAL_EVALUATION"),
+            "context_summary": getattr(inc, "context_summary", ""),
+        })
+    return buf.getvalue()
 
 
-def export_evidence_to_csv(incidents: List[Incident], file_path: Union[str, Path]) -> None:
-    """Exports raw evidence rows across all incidents with exact row/file provenance."""
+def export_incidents_to_csv(incidents: List[Incident], file_path: Union[str, Path]) -> None:
+    """Exports summary of security incidents to CSV."""
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    content = generate_incidents_csv(incidents)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        f.write(content)
 
+
+def generate_evidence_csv(incidents: List[Incident]) -> str:
+    """Generates raw evidence rows across all incidents as an in-memory CSV string."""
     fieldnames = [
         "incident_id",
         "source_file",
@@ -84,21 +89,28 @@ def export_evidence_to_csv(incidents: List[Incident], file_path: Union[str, Path
         "logon_type",
     ]
 
-    with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for inc in incidents:
-            for ev in inc.evidence_records:
-                row_dict = ev.to_dict()
-                row_dict["incident_id"] = inc.incident_id
-                writer.writerow(row_dict)
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    for inc in incidents:
+        for ev in inc.evidence_records:
+            row_dict = ev.to_dict()
+            row_dict["incident_id"] = inc.incident_id
+            writer.writerow(row_dict)
+    return buf.getvalue()
 
 
-def export_user_risk_to_csv(profiles: List[UserRiskProfile], file_path: Union[str, Path]) -> None:
-    """Exports consolidated per-user 0-100 risk profiles to CSV."""
+def export_evidence_to_csv(incidents: List[Incident], file_path: Union[str, Path]) -> None:
+    """Exports raw evidence rows across all incidents with exact row/file provenance."""
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
+    content = generate_evidence_csv(incidents)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        f.write(content)
 
+
+def generate_user_risk_csv(profiles: List[UserRiskProfile]) -> str:
+    """Generates consolidated per-user 0-100 risk profiles as an in-memory CSV string."""
     fieldnames = [
         "username",
         "risk_score",
@@ -109,19 +121,32 @@ def export_user_risk_to_csv(profiles: List[UserRiskProfile], file_path: Union[st
         "score_rationale",
     ]
 
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames)
+    writer.writeheader()
+    for p in profiles:
+        writer.writerow({
+            "username": p.username,
+            "risk_score": p.risk_score,
+            "baseline_status": p.baseline_status,
+            "incident_count": p.incident_count,
+            "highest_severity": p.highest_severity,
+            "rules_triggered": "; ".join(p.rules_triggered),
+            "score_rationale": p.score_rationale,
+        })
+    return buf.getvalue()
+
+
+generate_users_csv = generate_user_risk_csv
+
+
+def export_user_risk_to_csv(profiles: List[UserRiskProfile], file_path: Union[str, Path]) -> None:
+    """Exports consolidated per-user 0-100 risk profiles to CSV."""
+    path = Path(file_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    content = generate_user_risk_csv(profiles)
     with path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for p in profiles:
-            writer.writerow({
-                "username": p.username,
-                "risk_score": p.risk_score,
-                "baseline_status": p.baseline_status,
-                "incident_count": p.incident_count,
-                "highest_severity": p.highest_severity,
-                "rules_triggered": "; ".join(p.rules_triggered),
-                "score_rationale": p.score_rationale,
-            })
+        f.write(content)
 
 
 def generate_html_report(

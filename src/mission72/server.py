@@ -15,6 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import os
 from mission72.baseline import build_user_baselines
 from mission72.context import ContextRegistry, create_default_context_registry
 from mission72.detections import DetectionEngine, RuleConfig
@@ -27,12 +28,19 @@ from mission72.reporting import (
     export_evidence_to_csv,
     export_incidents_to_csv,
     export_user_risk_to_csv,
+    generate_evidence_csv,
     generate_html_report,
+    generate_incidents_csv,
+    generate_user_risk_csv,
 )
 
 
 def get_active_context_registry() -> ContextRegistry:
     cfg_path = Path("config/context_config.json")
+    if not cfg_path.exists():
+        alt_path = Path(__file__).resolve().parent.parent.parent / "config" / "context_config.json"
+        if alt_path.exists():
+            cfg_path = alt_path
     if cfg_path.exists():
         try:
             return ContextRegistry.from_file(cfg_path)
@@ -911,9 +919,19 @@ def parse_multipart_form_data(
 class InvestigatorRequestHandler(BaseHTTPRequestHandler):
     """Handles HTTP requests for the local investigator interface."""
 
+    def _get_request_path(self) -> str:
+        # Check for original forwarded path from reverse proxies / Vercel
+        raw_path = self.headers.get("x-matched-path") or self.headers.get("x-forwarded-uri") or self.path
+        parsed = urllib.parse.urlparse(raw_path)
+        path = parsed.path
+        if path.startswith("/api/index"):
+            path = path[len("/api/index"):] or "/"
+        elif path.startswith("/api"):
+            path = path[len("/api"):] or "/"
+        return path
+
     def do_GET(self) -> None:
-        parsed_url = urllib.parse.urlparse(self.path)
-        path = parsed_url.path
+        path = self._get_request_path()
 
         if path in ("/", "/index.html"):
             self._render_dashboard()
@@ -932,14 +950,55 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self) -> None:
-        parsed_url = urllib.parse.urlparse(self.path)
-        if parsed_url.path == "/analyze":
+        path = self._get_request_path()
+        if path == "/analyze":
             self._handle_file_upload()
         else:
             self.send_response(404)
             self.end_headers()
 
+    def _load_synthetic_into_state(self) -> None:
+        train_path = Path("data/synthetic/synthetic_training_auth.csv")
+        eval_path = Path("data/synthetic/synthetic_evaluation_auth.csv")
+
+        if not train_path.exists():
+            alt_train = Path(__file__).resolve().parent.parent.parent / "data" / "synthetic" / "synthetic_training_auth.csv"
+            alt_eval = Path(__file__).resolve().parent.parent.parent / "data" / "synthetic" / "synthetic_evaluation_auth.csv"
+            if alt_train.exists() and alt_eval.exists():
+                train_path = alt_train
+                eval_path = alt_eval
+
+        if not train_path.exists() or not eval_path.exists():
+            from mission72.synthetic import generate_synthetic_datasets
+            generate_synthetic_datasets("data/synthetic")
+
+        with train_path.open("r", encoding="utf-8-sig") as f:
+            train_events, _ = parse_csv_stream(f, source_file=str(train_path))
+
+        with eval_path.open("r", encoding="utf-8-sig") as f:
+            eval_events, q_rep = parse_csv_stream(f, source_file=str(eval_path))
+
+        repo = build_user_baselines(train_events, min_training_events=5)
+        context_reg = get_active_context_registry()
+        engine = DetectionEngine(baseline_repo=repo, context_registry=context_reg)
+        alerts = engine.run_all(eval_events)
+        incidents = group_alerts_into_incidents(alerts, context_registry=context_reg)
+        user_profiles = compute_user_risk_profiles(incidents, repo, eval_events, context_registry=context_reg)
+
+        GLOBAL_STATE.incidents = incidents
+        GLOBAL_STATE.user_profiles = user_profiles
+        GLOBAL_STATE.quality_report = q_rep
+        GLOBAL_STATE.training_events_count = len(train_events)
+        GLOBAL_STATE.evaluation_events_count = len(eval_events)
+
     def _render_dashboard(self) -> None:
+        if not GLOBAL_STATE.incidents and (
+            os.environ.get("VERCEL")
+            or os.environ.get("RENDER")
+            or os.environ.get("PRELOAD_BENCHMARK")
+        ):
+            self._load_synthetic_into_state()
+
         incidents     = GLOBAL_STATE.incidents
         user_profiles = GLOBAL_STATE.user_profiles
 
@@ -996,32 +1055,7 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(html_out.encode("utf-8"))
 
     def _analyze_synthetic(self) -> None:
-        train_path = Path("data/synthetic/synthetic_training_auth.csv")
-        eval_path = Path("data/synthetic/synthetic_evaluation_auth.csv")
-
-        if not train_path.exists() or not eval_path.exists():
-            from mission72.synthetic import generate_synthetic_datasets
-            generate_synthetic_datasets("data/synthetic")
-
-        with train_path.open("r", encoding="utf-8-sig") as f:
-            train_events, _ = parse_csv_stream(f, source_file=str(train_path))
-
-        with eval_path.open("r", encoding="utf-8-sig") as f:
-            eval_events, q_rep = parse_csv_stream(f, source_file=str(eval_path))
-
-        repo = build_user_baselines(train_events, min_training_events=5)
-        context_reg = get_active_context_registry()
-        engine = DetectionEngine(baseline_repo=repo, context_registry=context_reg)
-        alerts = engine.run_all(eval_events)
-        incidents = group_alerts_into_incidents(alerts, context_registry=context_reg)
-        user_profiles = compute_user_risk_profiles(incidents, repo, eval_events, context_registry=context_reg)
-
-        GLOBAL_STATE.incidents = incidents
-        GLOBAL_STATE.user_profiles = user_profiles
-        GLOBAL_STATE.quality_report = q_rep
-        GLOBAL_STATE.training_events_count = len(train_events)
-        GLOBAL_STATE.evaluation_events_count = len(eval_events)
-
+        self._load_synthetic_into_state()
         self.send_response(302)
         self.send_header("Location", "/")
         self.end_headers()
@@ -1072,23 +1106,24 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _export_csv(self, kind: str) -> None:
-        buf = io.StringIO()
+        if not GLOBAL_STATE.incidents and (
+            os.environ.get("VERCEL")
+            or os.environ.get("RENDER")
+            or os.environ.get("PRELOAD_BENCHMARK")
+        ):
+            self._load_synthetic_into_state()
+
         if kind == "incidents":
-            export_incidents_to_csv(GLOBAL_STATE.incidents, Path("scratch_incidents.csv"))
-            data = Path("scratch_incidents.csv").read_bytes()
-            Path("scratch_incidents.csv").unlink(missing_ok=True)
+            csv_text = generate_incidents_csv(GLOBAL_STATE.incidents)
             filename = "mission72_incidents.csv"
         elif kind == "evidence":
-            export_evidence_to_csv(GLOBAL_STATE.incidents, Path("scratch_evidence.csv"))
-            data = Path("scratch_evidence.csv").read_bytes()
-            Path("scratch_evidence.csv").unlink(missing_ok=True)
+            csv_text = generate_evidence_csv(GLOBAL_STATE.incidents)
             filename = "mission72_evidence.csv"
         else:
-            export_user_risk_to_csv(GLOBAL_STATE.user_profiles, Path("scratch_users.csv"))
-            data = Path("scratch_users.csv").read_bytes()
-            Path("scratch_users.csv").unlink(missing_ok=True)
+            csv_text = generate_user_risk_csv(GLOBAL_STATE.user_profiles)
             filename = "mission72_user_risk_profiles.csv"
 
+        data = csv_text.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/csv; charset=utf-8")
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
@@ -1096,6 +1131,13 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def _export_html(self) -> None:
+        if not GLOBAL_STATE.incidents and (
+            os.environ.get("VERCEL")
+            or os.environ.get("RENDER")
+            or os.environ.get("PRELOAD_BENCHMARK")
+        ):
+            self._load_synthetic_into_state()
+
         content = generate_html_report(
             GLOBAL_STATE.incidents,
             GLOBAL_STATE.user_profiles,
@@ -1108,11 +1150,16 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(content.encode("utf-8"))
 
 
-def start_server(port: int = 8072) -> None:
-    """Starts the local investigator web dashboard."""
-    server_address = ("127.0.0.1", port)
+def start_server(port: Optional[int] = None, host: Optional[str] = None) -> None:
+    """Starts the investigator web dashboard."""
+    if host is None:
+        host = os.environ.get("HOST", "127.0.0.1")
+    if port is None:
+        port = int(os.environ.get("PORT", "8072"))
+
+    server_address = (host, port)
     httpd = ThreadingHTTPServer(server_address, InvestigatorRequestHandler)
-    print(f"Mission 72 Investigator Console started at http://127.0.0.1:{port}")
+    print(f"Mission 72 Investigator Console started at http://{host}:{port}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

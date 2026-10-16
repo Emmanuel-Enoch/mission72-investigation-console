@@ -250,5 +250,68 @@ class TestServerEndpoints(unittest.TestCase):
         self.assertEqual(ctx.exception.code, 400)
 
 
+class TestCloudAndServerlessSupport(unittest.TestCase):
+    """Verifies serverless path normalization, in-memory CSV generators, and cloud environment handling."""
+
+    def test_in_memory_csv_generators(self) -> None:
+        from mission72.reporting import (
+            generate_evidence_csv,
+            generate_incidents_csv,
+            generate_user_risk_csv,
+        )
+        # Empty incident/profile list generates valid CSV headers
+        inc_csv = generate_incidents_csv([])
+        self.assertIn("incident_id,title,primary_entity", inc_csv)
+
+        ev_csv = generate_evidence_csv([])
+        self.assertIn("incident_id,source_file,row_number", ev_csv)
+
+        user_csv = generate_user_risk_csv([])
+        self.assertIn("username,risk_score,baseline_status", user_csv)
+
+    def test_path_normalization(self) -> None:
+        handler = object.__new__(InvestigatorRequestHandler)
+        handler.headers = {}
+
+        # Standard root
+        handler.path = "/"
+        self.assertEqual(handler._get_request_path(), "/")
+
+        # Direct Vercel function path
+        handler.path = "/api/index"
+        self.assertEqual(handler._get_request_path(), "/")
+
+        # Subpath under /api/index
+        handler.path = "/api/index/export/incidents.csv"
+        self.assertEqual(handler._get_request_path(), "/export/incidents.csv")
+
+        # Subpath under /api
+        handler.path = "/api/analyze-synthetic"
+        self.assertEqual(handler._get_request_path(), "/analyze-synthetic")
+
+        # Reverse proxy matched path header
+        handler.headers = {"x-matched-path": "/export/evidence.csv"}
+        handler.path = "/api/index"
+        self.assertEqual(handler._get_request_path(), "/export/evidence.csv")
+
+    def test_cloud_auto_preload_when_empty(self) -> None:
+        import os
+        from mission72.server import GLOBAL_STATE
+
+        # Reset global state to empty
+        GLOBAL_STATE.incidents = []
+        GLOBAL_STATE.user_profiles = []
+
+        handler = object.__new__(InvestigatorRequestHandler)
+        # Simulate running in Vercel environment
+        os.environ["VERCEL"] = "1"
+        try:
+            handler._load_synthetic_into_state()
+            self.assertGreater(len(GLOBAL_STATE.incidents), 0)
+            self.assertGreater(len(GLOBAL_STATE.user_profiles), 0)
+        finally:
+            os.environ.pop("VERCEL", None)
+
+
 if __name__ == "__main__":
     unittest.main()

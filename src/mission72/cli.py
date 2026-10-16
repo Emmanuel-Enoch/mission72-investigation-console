@@ -5,6 +5,7 @@ and launching the local investigator dashboard.
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Optional
@@ -113,8 +114,18 @@ def main() -> int:
     analyze_parser.add_argument("--context-config", help="Path to JSON file containing maintenance windows, authorized accounts, and VPN endpoints")
 
     # Subcommand: serve
-    serve_parser = subparsers.add_parser("serve", help="Launch local investigator dashboard")
-    serve_parser.add_argument("--port", type=int, default=8072, help="Port to serve on (default: 8072)")
+    serve_parser = subparsers.add_parser("serve", help="Launch investigator dashboard")
+    serve_parser.add_argument(
+        "--host",
+        default=os.environ.get("HOST", "127.0.0.1"),
+        help="Host address to bind to (default: 127.0.0.1, or $HOST env var)",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PORT", "8072")),
+        help="Port to serve on (default: 8072, or $PORT env var)",
+    )
 
     # Subcommand: synthetic
     synthetic_parser = subparsers.add_parser("synthetic", help="Generate synthetic benchmark datasets")
@@ -136,7 +147,7 @@ def main() -> int:
         )
     elif args.command == "serve":
         from mission72.server import start_server
-        start_server(args.port)
+        start_server(port=args.port, host=args.host)
         return 0
     elif args.command == "synthetic":
         t, e = generate_synthetic_datasets(output_dir=args.output_dir, seed=args.seed)

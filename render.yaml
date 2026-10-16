@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: mission72-investigation-console
+    env: python
+    buildCommand: ""
+    startCommand: "python main.py serve --host 0.0.0.0"
+    plan: free
+    autoDeploy: true
