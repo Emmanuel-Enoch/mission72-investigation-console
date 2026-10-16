@@ -36,6 +36,8 @@ def export_incidents_to_csv(incidents: List[Incident], file_path: Union[str, Pat
         "destination_hosts",
         "triage_summary",
         "recommended_action",
+        "context_status",
+        "context_summary",
     ]
 
     with path.open("w", encoding="utf-8", newline="") as f:
@@ -59,6 +61,8 @@ def export_incidents_to_csv(incidents: List[Incident], file_path: Union[str, Pat
                 "destination_hosts": "; ".join(inc.destination_hosts),
                 "triage_summary": inc.triage_summary,
                 "recommended_action": inc.recommended_action,
+                "context_status": getattr(inc, "context_status", "NORMAL_EVALUATION"),
+                "context_summary": getattr(inc, "context_summary", ""),
             })
 
 
@@ -168,6 +172,20 @@ def generate_html_report(
         rule_badges = ", ".join([f'<span class="badge badge-rule">{html.escape(r)}</span>' for r in inc.rule_ids])
         cat_badges = "".join([f'<span class="badge badge-cat">{html.escape(c)}</span>' for c in inc.categories])
 
+        context_status_badge = ""
+        c_status = getattr(inc, "context_status", "NORMAL_EVALUATION")
+        c_summary = getattr(inc, "context_summary", "")
+        if c_status == "APPROVED_MAINTENANCE":
+            context_status_badge = '<span class="badge" style="background:#064e3b;color:#34d399;border:1px solid #059669;margin-right:6px">APPROVED MAINTENANCE</span>'
+        elif c_status == "VERIFIED_VPN":
+            context_status_badge = '<span class="badge" style="background:#1e3a8a;color:#60a5fa;border:1px solid #3b82f6;margin-right:6px">VERIFIED VPN</span>'
+        elif c_status == "APPROVAL_MISMATCH":
+            context_status_badge = '<span class="badge" style="background:#78350f;color:#fbbf24;border:1px solid #d97706;margin-right:6px">APPROVAL MISMATCH</span>'
+
+        context_html = ""
+        if c_summary:
+            context_html = f'<div class="card-explanation" style="border-left: 3px solid #6366f1; margin-top: 6px;"><strong>Context Evaluation:</strong> {context_status_badge}{html.escape(c_summary)}</div>'
+
         card_html = f"""
         <div class="incident-card" data-severity="{inc.severity}" data-entity="{html.escape(inc.primary_entity.lower())}" data-score="{inc.risk_score}">
             <div class="card-header">
@@ -190,6 +208,7 @@ def generate_html_report(
             <div class="card-explanation">
                 <strong>Score Derivation:</strong> {html.escape(inc.risk_explanation)}
             </div>
+            {context_html}
             <div class="card-action">
                 <strong>Recommended Triage:</strong> {html.escape(inc.recommended_action)}
             </div>

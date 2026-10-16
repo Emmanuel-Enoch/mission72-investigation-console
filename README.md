@@ -1,39 +1,63 @@
 # Mission 72 — Suspicious Login and Activity Detector
+## Mission 02: Context-Aware Alert Detection & False-Positive Reduction
 
-An offline cybersecurity authentication log analysis and incident triage platform. It profiles user behavior strictly from training-period history, validates ingestion quality, detects threats across all six required categories, correlates events into security incidents, computes explainable 0–100 risk scores, and generates offline CSV and interactive HTML investigation reports.
+An offline cybersecurity authentication log analysis and incident triage platform. It profiles user behavior strictly from training-period history, validates ingestion quality, evaluates contextual organizational policies (IT maintenance windows, account roles, and recognized corporate VPNs), detects threats across all six required categories, correlates events into security incidents, computes explainable 0–100 risk scores, and generates offline CSV and interactive HTML investigation reports.
 
 ---
 
-## Current Status: Working End-to-End MVP
+## Current Status: Mission 02 Context-Aware Implementation Complete
 
-The project has reached a fully functional, testable local MVP with zero external dependencies:
+The project is fully implemented, strictly deterministic, air-gapped capable, and validated with **59 passing automated tests** across all 13 challenge scenarios:
 
-1. **Six Implemented Detection Categories (`src/mission72/detections.py`):**
-   - `RULE-01-REPEATED-FAILURES`: Repeated authentication failures against a single user within a sliding window.
+1. **Context Policy Engine (`src/mission72/context.py` & `config/context_config.json`):**
+   - **Declared IT Maintenance Windows:** Supports start/end timestamps (strict UTC ISO-8601 normalization), exact boundary matching (`start <= ts <= end`), scoped target host globbing (`srv-patch-*`), permitted activity types (`AUTHENTICATION`, `ADMIN_LOGON`), and authorized account/role permissions. Inverted or zero-duration windows are rejected at configuration time.
+   - **Account Roles & Scoped Authorizations:** Distinct roles (`helpdesk`, `sysadmin`, `standard_user`) with granular allowed target footprints and activity validity windows. Helpdesk roles do not receive blanket access to unapproved targets.
+   - **Recognized Corporate VPN Registry:** CIDR subnet and discrete IP matching (`198.51.100.0/24`), geolocation tagging, and explicit trust flags (`is_trusted=True` vs untrusted proxies/anonymizers). Provides evidence-based location risk mitigation without blind trust.
+
+2. **Context-Aware Threat Detections (`src/mission72/detections.py`):**
+   - `RULE-01-REPEATED-FAILURES`: Repeated authentication failures against a single user within sliding window.
    - `RULE-02-BURST-THEN-SUCCESS`: Failure burst followed by a successful login within minutes (credential compromise indicator).
    - `RULE-03-PASSWORD-SPRAY`: Distributed authentication failures targeting multiple distinct user accounts from a single source IP.
    - `RULE-04-UNUSUAL-TIME`: Login attempts at anomalous hours relative to the user's established baseline (*strictly evaluated only for users with established normal history*).
-   - `RULE-05-UNFAMILIAR-IP`: Access originating from source IPs never observed during training, enriched with geo-location metadata when lookup tables are supplied.
-   - `RULE-06-UNFAMILIAR-HOSTS`: Sudden access targeting destination hosts outside the user's established normal footprint, with elevated severity for critical assets (e.g. domain controllers).
+   - `RULE-05-UNFAMILIAR-IP`: Context-aware source IP evaluation. Connections from verified corporate VPNs have severity reduced to `LOW` with explicit mitigating explanation; connections from untrusted proxies are escalated to `HIGH`; unknown IPs retain standard `MEDIUM` severity.
+   - `RULE-06-UNFAMILIAR-HOSTS`: Context-aware lateral movement evaluation. Access by authorized helpdesk staff to approved hosts during active maintenance is classified with severity `LOW` and flagged as `(Approved IT Maintenance Window)`. Access outside windows or to unapproved hosts retains full severity and logs explicit mismatch audits.
 
-2. **Incident Grouping & Explainable 0–100 Risk Scoring (`src/mission72/incidents.py`):**
+3. **Incident Grouping & Explainable 0–100 Risk Scoring (`src/mission72/incidents.py`):**
    - Correlates discrete alerts by account or source IP within temporal clustering windows.
-   - Preserves complete evidence provenance: original source filename, row numbers, and raw timestamps.
-   - Computes deterministic, bounded (0–100) risk scores with a transparent mathematical explanation:
-     $$\text{Score} = \min\Big(100, \text{Base}(\text{MaxSeverity}) + \text{MultiCategoryBonus} + \text{EvidenceVolumeBonus} + \text{SensitiveTargetBonus}\Big)$$
-   - Supplies concrete, actionable triage recommendations for each incident.
+   - Preserves complete evidence provenance: original source filename, row numbers, timestamps, and contextual match/mismatch reasons.
+   - Computes deterministic, bounded [0, 100] risk scores with a transparent mathematical explanation:
+     $$\text{Score} = \max\Big(0, \min\big(100, \text{Base}(\text{MaxSeverity}) + \text{MultiCategoryBonus} + \text{EvidenceVolumeBonus} + \text{SensitiveTargetBonus} - \text{ContextMitigationDiscount}\big)\Big)$$
+   - Mitigations:
+     - Approved IT Maintenance Window: $-35$ points (full approval on all activity).
+     - Verified Corporate VPN Gateway: $-15$ points (mitigates unfamiliar location risk).
+     - Scope Violations / Mismatches: $0$ points discount (preserves full suspicious indicators).
 
-3. **Local Investigator Interface & Exporters (`src/mission72/reporting.py`, `src/mission72/server.py`):**
-   - **Offline HTML Dashboard:** Fully self-contained single-page report with responsive layout, metric cards, incident filter controls, per-user risk breakdown, and collapsible evidence tables. Zero external CDN/font/script dependencies.
+4. **Investigator Interface & Reporting (`src/mission72/reporting.py`, `src/mission72/server.py`):**
+   - **Interactive Local Dashboard:** Clean dark-mode UI with summary metrics, dynamic filtering, contextual policy status badges (`APPROVED_MAINTENANCE`, `VERIFIED_VPN`, `APPROVAL_MISMATCH`), expandable score breakdowns, and raw evidence tables.
    - **CSV Exports:** Exports `incidents.csv`, `evidence.csv`, and `user_risk_profiles.csv`.
-   - **Local Web Console:** Python built-in `http.server` running locally at `http://127.0.0.1:8072` supporting interactive log uploads, synthetic benchmark analysis, and live downloads.
+   - **HTML Report:** Self-contained, printable single-file HTML report with contextual badges and evidence audits.
 
-4. **Preserved Stage 1 Guarantees:**
-   - Training-only baselining with strict cutoff enforcement (zero data leakage from evaluation records).
-   - Baseline safety: only successful authentications establish normal behavior; failed attempts are not learned.
-   - Ambiguous timestamp detection (slash dates where day and month $\le 12$ are flagged rather than guessed).
-   - Schema validation distinguishes missing columns from missing cell values.
-   - Duplicate candidate fingerprinting preserves raw evidence without claiming physical identity.
+---
+
+## Scenario Verification Matrix (Section 4 Requirements)
+
+All 13 required scenarios are covered by deterministic tests in `tests/test_mission02_context.py`:
+
+| # | Scenario | Expected Outcome | Implemented Behaviour & Status | Test Method |
+|---|---|---|---|---|
+| 1 | Authorized helpdesk on approved hosts during active maintenance | Appropriate contextual risk reduction with explicit explanation; evidence preserved | Rule 6 severity reduced to `LOW`; $-35$ pts maintenance discount applied; evidence preserved (`context_status = APPROVED_MAINTENANCE`) | `test_scenario_01_authorized_helpdesk_approved_hosts_during_maintenance` |
+| 2 | Helpdesk accessing hosts outside approved window | No maintenance-based exemption; suspicious evidence remains | Out-of-window timestamp flagged; no discount granted; full risk score maintained ($\ge 35$) | `test_scenario_02_helpdesk_accessing_hosts_outside_maintenance_window` |
+| 3 | Helpdesk accessing unapproved host during maintenance | Approval mismatch remains visible; affects risk appropriately | Target host mismatch recorded (`APPROVAL_MISMATCH`); $0$ maintenance discount granted; risk preserved | `test_scenario_03_helpdesk_accessing_unapproved_host_during_maintenance` |
+| 4 | Travelling employee using recognized company VPN | VPN context influences score without blindly declaring event safe | Alert severity reduced to `LOW`; $-15$ pts discount applied (`VERIFIED_VPN`); subsequent attacks remain alertable | `test_scenario_04_travelling_employee_using_company_vpn` |
+| 5 | New-location login without VPN evidence | Standard location anomaly remains detectable | Alert triggered at `MEDIUM` severity; no VPN discount; full risk score applied (35 pts) | `test_scenario_05_new_location_without_vpn_evidence` |
+| 6 | Unknown or untrusted VPN endpoint | Treated as unverified/rogue; flagged for review; no automatic discount | Flagged as `Untrusted VPN / Proxy`; escalated to `HIGH` severity; $0$ discount; risk score 55 | `test_scenario_06_login_from_untrusted_vpn_endpoint` |
+| 7 | Regular user accessing many unfamiliar hosts during maintenance | Suspicious-access detection remains effective; non-IT user not exempt | Role authorization checked; regular user rejected for maintenance exemption; alert remains active | `test_scenario_07_regular_user_accessing_many_unfamiliar_hosts` |
+| 8 | Maintenance window with invalid/inverted timestamps | Configuration rejected or clearly reported; normal alerting proceeds safely | Inverted window (`start >= end`) raises `ValueError` and is rejected with warning; registry operates safely | `test_scenario_08_maintenance_window_with_invalid_timestamps_rejected` |
+| 9 | Event at exact maintenance-window boundary | Deterministic, documented boundary behavior applied consistently | Inclusive boundary policy (`start <= ts <= end`): events exactly at `start` and `end` match; outside by $1$s fails | `test_scenario_09_exact_maintenance_window_boundary_behavior` |
+| 10 | Missing account, host, timestamp, or VPN fields | Safe, deterministic handling with visible uncertainty | Missing/empty fields evaluate without crashing; fall back to unmitigated alerting | `test_scenario_10_missing_fields_safe_handling` |
+| 11 | Conflicting context signals | Balanced scoring reflecting mitigating and aggravating factors | Incident captures both Rule 5 (unfamiliar IP) and Rule 6 (mitigated hosts); math breakdown explains net score | `test_scenario_11_conflicting_context_signals` |
+| 12 | Duplicate event ingested | Documented, deterministic duplicate behavior without unintended score inflation | Flagged in `DataQualityReport.duplicate_candidate_count`; raw evidence preserved with exact line numbers | `test_scenario_12_duplicate_event_ingestion_behavior` |
+| 13 | Unrelated events with similar attributes during maintenance | Correctly attributed to separate incidents; no incorrect merge | Clustered by distinct entity (`frank.helpdesk` vs `alice.smith`), yielding two separate incidents | `test_scenario_13_unrelated_events_not_incorrectly_merged` |
 
 ---
 
@@ -41,16 +65,17 @@ The project has reached a fully functional, testable local MVP with zero externa
 
 ```text
 Missionathon/
-├── main.py                                  # Root execution script
-├── README.md                                # Setup, usage, and submission guide
+├── main.py                                  # Root execution entrypoint
+├── README.md                                # Project documentation & scenario matrix
 ├── config/
-│   └── default_rules.yaml                   # Rule parameters and thresholds
+│   ├── default_rules.yaml                   # Rule parameters and detection thresholds
+│   └── context_config.json                  # Maintenance windows, account roles, and VPN endpoints
 ├── data/
 │   └── synthetic/                           # Clearly labelled synthetic benchmark data
 │       ├── README.md                        # Synthetic dataset notice & manifest
 │       ├── synthetic_training_auth.csv      # Baseline training dataset (Oct 1 - Oct 10)
 │       └── synthetic_evaluation_auth.csv    # Chronologically sorted evaluation dataset
-├── reports/                                 # Generated reports (HTML, CSV)
+├── reports/                                 # Generated audit reports (HTML, CSV)
 │   ├── investigation_report.html
 │   ├── incidents.csv
 │   ├── evidence.csv
@@ -59,76 +84,91 @@ Missionathon/
 │   └── mission72/
 │       ├── __init__.py
 │       ├── models.py                        # Canonical AuthEvent, UserBaseline, DataQualityReport
+│       ├── context.py                       # MaintenanceWindow, AccountAuthorization, VpnEndpoint, ContextRegistry
 │       ├── ingestion.py                     # CSV parser, timestamp normalizer, quality validator (utf-8-sig)
-│       ├── baseline.py                      # Safe training baseline profiler & coverage engine
-│       ├── detections.py                    # All six mandatory detection rules
-│       ├── incidents.py                     # Incident grouping & explainable 0-100 risk scoring
+│       ├── baseline.py                      # Leak-free training baseline profiler & coverage engine
+│       ├── detections.py                    # All six detection rules with context awareness
+│       ├── incidents.py                     # Incident clustering & explainable [0, 100] risk scoring
 │       ├── reporting.py                     # Standalone HTML dashboard and CSV exporters
-│       ├── server.py                        # Zero-dependency local web dashboard (http.server)
+│       ├── server.py                        # Python 3.13-compatible local web dashboard (http.server)
 │       ├── cli.py                           # CLI entrypoint for analysis and server commands
 │       └── synthetic.py                     # Deterministic synthetic data generator with active seed
 └── tests/
     ├── __init__.py
-    ├── test_stage1.py                       # 17 ingestion, baseline & quality regression tests
-    ├── test_mvp.py                          # 11 rule, scoring, grouping, and end-to-end tests
-    └── test_server.py                       # 11 server HTTP, Python 3.13 multipart & regression tests
+    ├── test_stage1.py                       # 16 ingestion, baseline & quality regression tests
+    ├── test_mvp.py                          # 20 rule, scoring, grouping, and end-to-end tests
+    ├── test_server.py                       # 10 server HTTP, Python 3.13 multipart & regression tests
+    └── test_mission02_context.py            # 13 deterministic tests covering Mission 02 scenarios
 ```
 
 ---
 
-## Prerequisites & Setup
+## Configuration Examples
 
-- **Python:** Python 3.10+ (tested on Python 3.13.15).
-- **Dependencies:** Standard library only (`csv`, `datetime`, `dataclasses`, `email`, `http.server`, `hashlib`, `unittest`, `pathlib`, `typing`, `random`).
-- **Network Access:** None. Fully offline and air-gapped capable.
+### Maintenance Windows (`config/context_config.json`)
 
----
-
-## Usage Instructions
-
-### 1. Run Offline End-to-End Analysis (CLI)
-
-Run full analysis on training and evaluation CSVs and generate HTML and CSV reports:
-
-```powershell
-python main.py analyze `
-  --train data/synthetic/synthetic_training_auth.csv `
-  --eval data/synthetic/synthetic_evaluation_auth.csv `
-  --html-out reports/investigation_report.html `
-  --csv-out reports/incidents.csv `
-  --evidence-csv-out reports/evidence.csv `
-  --user-csv-out reports/user_risk_profiles.csv
+```json
+{
+  "maintenance_windows": [
+    {
+      "window_id": "MW-2026-10-PATCH",
+      "start_time_utc": "2026-10-15T02:00:00Z",
+      "end_time_utc": "2026-10-15T06:00:00Z",
+      "approved_hosts": ["srv-patch-*", "srv-db-01", "srv-app-01"],
+      "permitted_activities": ["AUTHENTICATION", "ADMIN_LOGON", "LOGON", "NETWORK"],
+      "authorized_accounts": ["frank.helpdesk", "sarah.admin"],
+      "authorized_roles": ["helpdesk", "sysadmin"],
+      "description": "Quarterly OS security patching and database indexing",
+      "change_reference": "CHG-98421"
+    }
+  ]
+}
 ```
 
-### 2. Launch Local Web Investigator Console
+### Account Roles & Authorizations
 
-Start the built-in offline server and open in any browser:
-
-```powershell
-python main.py serve --port 8072
+```json
+{
+  "account_authorizations": [
+    {
+      "username": "frank.helpdesk",
+      "role": "helpdesk",
+      "permitted_targets": ["srv-patch-*", "srv-db-01", "srv-app-01", "ws-hd-01"],
+      "approved_activities": ["AUTHENTICATION", "LOGON", "NETWORK"],
+      "is_active": true
+    },
+    {
+      "username": "alice.smith",
+      "role": "standard_user",
+      "permitted_targets": ["corp-workstation-01"],
+      "approved_activities": ["AUTHENTICATION", "LOGON", "NETWORK"],
+      "is_active": true
+    }
+  ]
+}
 ```
 
-Navigate to `http://127.0.0.1:8072` in your browser. From the interface you can:
-- Upload any training and evaluation CSVs.
-- Click **"Load Synthetic Benchmark"** to test pre-packaged scenarios.
-- Filter incidents dynamically by username, severity, and minimum risk score.
-- Expand correlated evidence rows with exact line provenance.
-- Download `incidents.csv`, `evidence.csv`, `user_risk_profiles.csv`, or the standalone `report.html`.
+### Recognized Corporate VPN Gateways
 
-### 3. Run the Automated Test Suite
-
-Run all 39 automated unit, regression, server, and end-to-end integration tests:
-
-```powershell
-python -m unittest discover -s tests -p "test_*.py" -v
-```
-
-### 4. Regenerate Synthetic Test Datasets
-
-Regenerate the deterministic benchmark datasets:
-
-```powershell
-python main.py synthetic --output-dir data/synthetic --seed 42
+```json
+{
+  "vpn_endpoints": [
+    {
+      "endpoint_id": "VPN-LON-01",
+      "cidr_or_ip": "198.51.100.0/24",
+      "name": "London Corporate VPN Gateway",
+      "location": "London, UK",
+      "is_trusted": true
+    },
+    {
+      "endpoint_id": "VPN-ROGUE-01",
+      "cidr_or_ip": "203.0.113.200/32",
+      "name": "Untrusted Public Anonymizer",
+      "location": "Untrusted Public Anonymizer",
+      "is_trusted": false
+    }
+  ]
+}
 ```
 
 ---
@@ -149,15 +189,56 @@ Incident risk scores ($0 \le \text{Score} \le 100$) are calculated deterministic
    - $\ge 5$ correlated events: $+5$ points
    - $\ge 10$ correlated events: $+10$ points
 4. **Sensitive Asset Targeting Bonus:**
-   - Targeting assets matching sensitive identifiers (`domain-controller`, `dc`, `admin`, `sec-ops`, `mail-gateway`, `vault`): $+10$ points
-5. **Clamping:** Score is strictly bounded between $0$ and $100$.
+   - Targeting assets matching sensitive identifiers (`domain-controller`, `dc`, `admin`, `sec-ops`, `vault`): $+10$ points
+5. **Contextual Mitigation Discount:**
+   - Approved IT Maintenance: $-35$ points (when all events match authorized window, hosts, and role).
+   - Verified Corporate VPN Gateway: $-15$ points (mitigates unfamiliar location risk).
+   - Mismatches or scope violations: $0$ points discount.
+6. **Clamping:** Score is strictly bounded between $0$ and $100$.
 
 ---
 
-## Shortest Route to Submission Deliverables
+## Execution Instructions
 
-Once official competition dataset files and submission portal stages are published:
-1. **Schema Alignment:** Compare the official CSV column headers to the canonical aliases in `FIELD_ALIASES` in [`src/mission72/ingestion.py`](file:///C:/Users/Emmy/Desktop/Missionathon/src/mission72/ingestion.py) and add any unique headers if necessary.
-2. **Geo-Location Data:** If official evaluation includes an IP-to-country lookup CSV, pass it into `DetectionEngine(ip_location_map=...)`.
-3. **Execute Official Run:** Run `python main.py analyze --train <official_train.csv> --eval <official_eval.csv> --html-out submission_report.html --csv-out submission_incidents.csv`.
-4. **Package Deliverables:** Submit the generated HTML report, CSV incident table, and clean repository code.
+### 1. Run Complete Automated Test Suite (59 Tests)
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+### 2. Run Context-Aware Offline Analysis (CLI)
+
+```powershell
+$env:PYTHONPATH = "src"
+python main.py analyze `
+  --train data/synthetic/synthetic_training_auth.csv `
+  --eval data/synthetic/synthetic_evaluation_auth.csv `
+  --context-config config/context_config.json `
+  --html-out reports/investigation_report.html `
+  --csv-out reports/incidents.csv `
+  --evidence-csv-out reports/evidence.csv `
+  --user-csv-out reports/users.csv
+```
+
+### 3. Launch Local Investigator Web Console
+
+```powershell
+$env:PYTHONPATH = "src"
+python main.py serve --port 8072
+```
+
+Navigate to `http://127.0.0.1:8072` in any browser:
+- Upload any evaluation CSV (with optional training CSV).
+- Click **"Load Synthetic Benchmark"** to test immediately.
+- Inspect contextual badges (`APPROVED_MAINTENANCE`, `VERIFIED_VPN`, `APPROVAL_MISMATCH`) in the incident detail panel.
+- Export correlated incident, evidence, user profile CSVs, or standalone HTML reports.
+
+---
+
+## Limitations & Assumptions
+
+1. **No External Network Connectivity:** The system is air-gapped; geolocation and VPN lookups are performed solely against local configuration data without external WHOIS or IP-lookup calls.
+2. **Context as Evidence, Not Proof:** A connection from a company VPN verifies network egress through corporate infrastructure; it does not prove the session is benign if credential-stuffing or password-spraying signatures are present.
+3. **Inclusive Boundary Policy:** Window checks evaluate `start <= timestamp <= end`. Events occurring precisely on the start or end timestamp are treated as within the window.
+4. **Non-destructive Ingestion:** Invalid or malformed rows are segregated into `DataQualityReport.malformed_records` and preserved without halting analysis.

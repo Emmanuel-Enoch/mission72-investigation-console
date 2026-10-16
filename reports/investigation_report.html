@@ -239,12 +239,13 @@
             <div class="card-meta">
                 <div><strong>Primary Entity:</strong> <code>dana.scully</code></div>
                 <div><strong>Time Window:</strong> 2026-10-12 18:00:00 to 18:02:20 UTC</div>
-                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-01-REPEATED-FAILURES</span><span class="badge badge-rule">RULE-02-BURST-THEN-SUCCESS</span><span class="badge badge-rule">RULE-04-UNUSUAL-TIME</span><span class="badge badge-rule">RULE-05-UNFAMILIAR-IP</span></div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-01-REPEATED-FAILURES</span>, <span class="badge badge-rule">RULE-02-BURST-THEN-SUCCESS</span>, <span class="badge badge-rule">RULE-04-UNUSUAL-TIME</span>, <span class="badge badge-rule">RULE-05-UNFAMILIAR-IP</span></div>
                 <div><strong>Categories:</strong> <span class="badge badge-cat">Authentication Anomaly</span><span class="badge badge-cat">Behavioral Anomaly</span><span class="badge badge-cat">Credential Compromise</span><span class="badge badge-cat">Network Anomaly</span></div>
             </div>
             <div class="card-explanation">
                 <strong>Score Derivation:</strong> Base Severity (CRITICAL): 75 pts | Multi-Category (4 categories): +20 pts | Evidence Volume (7 rows): +5 pts | Sensitive Asset Targeting: +10 pts -&gt; Total Score: 100/100
             </div>
+            <div class="card-explanation" style="border-left: 3px solid #6366f1; margin-top: 6px;"><strong>Context Evaluation:</strong> Standard evaluation (no contextual mitigation active).</div>
             <div class="card-action">
                 <strong>Recommended Triage:</strong> Verify with user if off-hours activity was expected or scheduled. | Check IP reputation and geolocation; verify whether user connected via new VPN or ISP. | Inspect source IPs for brute-force origins; verify if account lockout was triggered. | High priority: Contact user immediately to verify legitimacy; consider revoking active session tokens.
             </div>
@@ -273,55 +274,6 @@
         </div>
         
 
-        <div class="incident-card" data-severity="HIGH" data-entity="external ip 203.0.113.88" data-score="75">
-            <div class="card-header">
-                <div>
-                    <span class="badge badge-high">HIGH</span>
-                    <span class="incident-id">INC-0005</span>
-                    <h3 class="incident-title">Password Spray Campaign from 203.0.113.88</h3>
-                </div>
-                <div class="score-box" style="border-color: #dc2626; color: #dc2626">
-                    <span class="score-val">75</span>
-                    <span class="score-label">RISK SCORE</span>
-                </div>
-            </div>
-            <div class="card-meta">
-                <div><strong>Primary Entity:</strong> <code>External IP 203.0.113.88</code></div>
-                <div><strong>Time Window:</strong> 2026-10-13 11:00:00 to 11:04:30 UTC</div>
-                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-03-PASSWORD-SPRAY</span></div>
-                <div><strong>Categories:</strong> <span class="badge badge-cat">Credential Access</span></div>
-            </div>
-            <div class="card-explanation">
-                <strong>Score Derivation:</strong> Base Severity (HIGH): 55 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (10 rows): +10 pts | Sensitive Asset Targeting: +10 pts -&gt; Total Score: 75/100
-            </div>
-            <div class="card-action">
-                <strong>Recommended Triage:</strong> Block offending source IP at edge firewall; check for successful logins from this IP.
-            </div>
-            <details class="evidence-details">
-                <summary>View Correlated Evidence Rows (10 events)</summary>
-                <div class="table-container">
-                    <table class="evidence-table">
-                        <thead>
-                            <tr>
-                                <th>Source : Line</th>
-                                <th>Timestamp (UTC)</th>
-                                <th>User</th>
-                                <th>Source IP</th>
-                                <th>Destination Host</th>
-                                <th>Event Type</th>
-                                <th>Result</th>
-                                <th>Logon Type</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td><code>synthetic_evaluation_auth.csv:26</code></td><td>2026-10-13T11:00:00+00:00</td><td><strong>svc_backup</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:27</code></td><td>2026-10-13T11:00:30+00:00</td><td><strong>admin</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:28</code></td><td>2026-10-13T11:01:00+00:00</td><td><strong>helpdesk</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:29</code></td><td>2026-10-13T11:01:30+00:00</td><td><strong>user01</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:30</code></td><td>2026-10-13T11:02:00+00:00</td><td><strong>user02</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:31</code></td><td>2026-10-13T11:02:30+00:00</td><td><strong>user03</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:32</code></td><td>2026-10-13T11:03:00+00:00</td><td><strong>user04</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:33</code></td><td>2026-10-13T11:03:30+00:00</td><td><strong>user05</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:34</code></td><td>2026-10-13T11:04:00+00:00</td><td><strong>user06</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:35</code></td><td>2026-10-13T11:04:30+00:00</td><td><strong>user07</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </details>
-        </div>
-        
-
         <div class="incident-card" data-severity="HIGH" data-entity="charlie.davis" data-score="75">
             <div class="card-header">
                 <div>
@@ -337,12 +289,13 @@
             <div class="card-meta">
                 <div><strong>Primary Entity:</strong> <code>charlie.davis</code></div>
                 <div><strong>Time Window:</strong> 2026-10-11 14:00:00 to 14:02:15 UTC</div>
-                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-01-REPEATED-FAILURES</span><span class="badge badge-rule">RULE-05-UNFAMILIAR-IP</span></div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-01-REPEATED-FAILURES</span>, <span class="badge badge-rule">RULE-05-UNFAMILIAR-IP</span></div>
                 <div><strong>Categories:</strong> <span class="badge badge-cat">Authentication Anomaly</span><span class="badge badge-cat">Network Anomaly</span></div>
             </div>
             <div class="card-explanation">
                 <strong>Score Derivation:</strong> Base Severity (HIGH): 55 pts | Multi-Category (2 categories): +10 pts | Evidence Volume (10 rows): +10 pts | Sensitive Asset Targeting: +0 pts -&gt; Total Score: 75/100
             </div>
+            <div class="card-explanation" style="border-left: 3px solid #6366f1; margin-top: 6px;"><strong>Context Evaluation:</strong> Standard evaluation (no contextual mitigation active).</div>
             <div class="card-action">
                 <strong>Recommended Triage:</strong> Check IP reputation and geolocation; verify whether user connected via new VPN or ISP. | Inspect source IPs for brute-force origins; verify if account lockout was triggered.
             </div>
@@ -392,6 +345,7 @@
             <div class="card-explanation">
                 <strong>Score Derivation:</strong> Base Severity (HIGH): 55 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (1 rows): +0 pts | Sensitive Asset Targeting: +10 pts -&gt; Total Score: 65/100
             </div>
+            <div class="card-explanation" style="border-left: 3px solid #6366f1; margin-top: 6px;"><strong>Context Evaluation:</strong> Standard evaluation (no contextual mitigation active).</div>
             <div class="card-action">
                 <strong>Recommended Triage:</strong> Investigate lateral movement risk; verify host access authorization.
             </div>
@@ -420,6 +374,56 @@
         </div>
         
 
+        <div class="incident-card" data-severity="HIGH" data-entity="external ip 203.0.113.88" data-score="65">
+            <div class="card-header">
+                <div>
+                    <span class="badge badge-high">HIGH</span>
+                    <span class="incident-id">INC-0005</span>
+                    <h3 class="incident-title">Password Spray Campaign from 203.0.113.88</h3>
+                </div>
+                <div class="score-box" style="border-color: #f59e0b; color: #f59e0b">
+                    <span class="score-val">65</span>
+                    <span class="score-label">RISK SCORE</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <div><strong>Primary Entity:</strong> <code>External IP 203.0.113.88</code></div>
+                <div><strong>Time Window:</strong> 2026-10-13 11:00:00 to 11:04:30 UTC</div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-03-PASSWORD-SPRAY</span></div>
+                <div><strong>Categories:</strong> <span class="badge badge-cat">Credential Access</span></div>
+            </div>
+            <div class="card-explanation">
+                <strong>Score Derivation:</strong> Base Severity (HIGH): 55 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (10 rows): +10 pts | Sensitive Asset Targeting: +0 pts -&gt; Total Score: 65/100
+            </div>
+            <div class="card-explanation" style="border-left: 3px solid #6366f1; margin-top: 6px;"><strong>Context Evaluation:</strong> Standard evaluation (no contextual mitigation active).</div>
+            <div class="card-action">
+                <strong>Recommended Triage:</strong> Block offending source IP at edge firewall; check for successful logins from this IP.
+            </div>
+            <details class="evidence-details">
+                <summary>View Correlated Evidence Rows (10 events)</summary>
+                <div class="table-container">
+                    <table class="evidence-table">
+                        <thead>
+                            <tr>
+                                <th>Source : Line</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>User</th>
+                                <th>Source IP</th>
+                                <th>Destination Host</th>
+                                <th>Event Type</th>
+                                <th>Result</th>
+                                <th>Logon Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>synthetic_evaluation_auth.csv:26</code></td><td>2026-10-13T11:00:00+00:00</td><td><strong>svc_backup</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:27</code></td><td>2026-10-13T11:00:30+00:00</td><td><strong>admin</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:28</code></td><td>2026-10-13T11:01:00+00:00</td><td><strong>helpdesk</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:29</code></td><td>2026-10-13T11:01:30+00:00</td><td><strong>user01</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:30</code></td><td>2026-10-13T11:02:00+00:00</td><td><strong>user02</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:31</code></td><td>2026-10-13T11:02:30+00:00</td><td><strong>user03</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:32</code></td><td>2026-10-13T11:03:00+00:00</td><td><strong>user04</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:33</code></td><td>2026-10-13T11:03:30+00:00</td><td><strong>user05</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:34</code></td><td>2026-10-13T11:04:00+00:00</td><td><strong>user06</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:35</code></td><td>2026-10-13T11:04:30+00:00</td><td><strong>user07</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+        
+
         <div class="incident-card" data-severity="MEDIUM" data-entity="bob.jones" data-score="35">
             <div class="card-header">
                 <div>
@@ -441,6 +445,7 @@
             <div class="card-explanation">
                 <strong>Score Derivation:</strong> Base Severity (MEDIUM): 35 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (1 rows): +0 pts | Sensitive Asset Targeting: +0 pts -&gt; Total Score: 35/100
             </div>
+            <div class="card-explanation" style="border-left: 3px solid #6366f1; margin-top: 6px;"><strong>Context Evaluation:</strong> Standard evaluation (no contextual mitigation active).</div>
             <div class="card-action">
                 <strong>Recommended Triage:</strong> Check IP reputation and geolocation; verify whether user connected via new VPN or ISP.
             </div>
@@ -490,6 +495,7 @@
             <div class="card-explanation">
                 <strong>Score Derivation:</strong> Base Severity (MEDIUM): 35 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (1 rows): +0 pts | Sensitive Asset Targeting: +0 pts -&gt; Total Score: 35/100
             </div>
+            <div class="card-explanation" style="border-left: 3px solid #6366f1; margin-top: 6px;"><strong>Context Evaluation:</strong> Standard evaluation (no contextual mitigation active).</div>
             <div class="card-action">
                 <strong>Recommended Triage:</strong> Verify with user if off-hours activity was expected or scheduled.
             </div>
@@ -536,7 +542,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td><strong>dana.scully</strong></td><td><span style='color: #dc2626; font-weight: bold;'>100 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>7</td><td><span class="badge badge-critical">CRITICAL</span></td><td><code>RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 100 | Multi-incident bonus (7 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP -&gt; Final Score: 100/100</td></tr><tr><td><strong>charlie.davis</strong></td><td><span style='color: #dc2626; font-weight: bold;'>90 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>10</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (10 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP -&gt; Final Score: 90/100</td></tr><tr><td><strong>user06</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user07</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user04</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>admin</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>svc_backup</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user03</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user01</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>helpdesk</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user02</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user05</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>alice.smith</strong></td><td><span style='color: #dc2626; font-weight: bold;'>70 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>2</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-04-UNUSUAL-TIME, RULE-06-UNFAMILIAR-HOSTS</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (2 incidents): +5 | Rules triggered: RULE-04-UNUSUAL-TIME, RULE-06-UNFAMILIAR-HOSTS -&gt; Final Score: 70/100</td></tr><tr><td><strong>bob.jones</strong></td><td><span style='color: #10b981; font-weight: bold;'>35 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>1</td><td><span class="badge badge-medium">MEDIUM</span></td><td><code>RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 35 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-05-UNFAMILIAR-IP -&gt; Final Score: 35/100</td></tr><tr><td><strong>edward.norton</strong></td><td><span style='color: #10b981; font-weight: bold;'>0 / 100</span></td><td><span class='badge badge-status'>INSUFFICIENT_DATA</span></td><td>0</td><td><span class="badge badge-normal">CLEAN</span></td><td><code>None</code></td><td class='small-text'>No suspicious alerts or anomalies detected (Risk: 0/100).</td></tr>
+                        <tr><td><strong>dana.scully</strong></td><td><span style='color: #dc2626; font-weight: bold;'>100 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>7</td><td><span class="badge badge-critical">CRITICAL</span></td><td><code>RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 100 | Multi-incident bonus (7 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP -&gt; Final Score: 100/100</td></tr><tr><td><strong>charlie.davis</strong></td><td><span style='color: #dc2626; font-weight: bold;'>90 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>10</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (10 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP -&gt; Final Score: 90/100</td></tr><tr><td><strong>alice.smith</strong></td><td><span style='color: #dc2626; font-weight: bold;'>70 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>2</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-04-UNUSUAL-TIME, RULE-06-UNFAMILIAR-HOSTS</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (2 incidents): +5 | Rules triggered: RULE-04-UNUSUAL-TIME, RULE-06-UNFAMILIAR-HOSTS -&gt; Final Score: 70/100</td></tr><tr><td><strong>user01</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>svc_backup</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>admin</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>user06</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>helpdesk</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>user03</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>user05</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>user02</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>user07</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>user04</strong></td><td><span style='color: #f59e0b; font-weight: bold;'>65 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 65/100</td></tr><tr><td><strong>bob.jones</strong></td><td><span style='color: #10b981; font-weight: bold;'>35 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>1</td><td><span class="badge badge-medium">MEDIUM</span></td><td><code>RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 35 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-05-UNFAMILIAR-IP -&gt; Final Score: 35/100</td></tr><tr><td><strong>edward.norton</strong></td><td><span style='color: #10b981; font-weight: bold;'>0 / 100</span></td><td><span class='badge badge-status'>INSUFFICIENT_DATA</span></td><td>0</td><td><span class="badge badge-normal">CLEAN</span></td><td><code>None</code></td><td class='small-text'>No suspicious alerts or anomalies detected (Risk: 0/100).</td></tr>
                     </tbody>
                 </table>
             </div>

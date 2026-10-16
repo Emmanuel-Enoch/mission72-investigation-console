@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from mission72.baseline import build_user_baselines
+from mission72.context import ContextRegistry, create_default_context_registry
 from mission72.detections import DetectionEngine, RuleConfig
 from mission72.incidents import (
     compute_user_risk_profiles,
@@ -33,8 +34,17 @@ def run_analysis(
     evidence_csv_out: Optional[str] = None,
     user_csv_out: Optional[str] = None,
     date_format: Optional[str] = None,
+    context_config: Optional[str] = None,
 ) -> int:
-    """Runs complete offline pipeline: Ingestion -> Baseline -> 6 Rules -> Incidents -> Reports."""
+    """Runs complete offline pipeline: Ingestion -> Baseline -> Context -> 6 Rules -> Incidents -> Reports."""
+    context_reg = None
+    if context_config:
+        context_reg = ContextRegistry.from_file(context_config)
+        print(f"[*] Loaded contextual policy from {context_config} ({len(context_reg.maintenance_windows)} windows, {len(context_reg.accounts)} accounts, {len(context_reg.vpn_endpoints)} VPNs)")
+    elif Path("config/context_config.json").exists():
+        context_reg = ContextRegistry.from_file("config/context_config.json")
+        print(f"[*] Loaded default contextual policy from config/context_config.json ({len(context_reg.maintenance_windows)} windows, {len(context_reg.accounts)} accounts, {len(context_reg.vpn_endpoints)} VPNs)")
+
     print(f"[*] Ingesting training baseline: {train_file}")
     train_events, train_quality = parse_csv_file(train_file, configured_date_format=date_format)
     print(f"    Loaded {train_quality.valid_records} valid baseline records ({train_quality.malformed_records} malformed)")
@@ -48,14 +58,14 @@ def run_analysis(
     eval_events, eval_quality = parse_csv_file(eval_file, configured_date_format=date_format)
     print(f"    Loaded {eval_quality.valid_records} valid records ({eval_quality.malformed_records} malformed, {eval_quality.duplicate_candidate_count} duplicate candidates)")
 
-    print(f"[*] Executing 6 detection rules...")
-    engine = DetectionEngine(baseline_repo=baseline_repo)
+    print(f"[*] Executing 6 detection rules (context-aware)...")
+    engine = DetectionEngine(baseline_repo=baseline_repo, context_registry=context_reg)
     alerts = engine.run_all(eval_events)
     print(f"    Triggered {len(alerts)} alerts across categories.")
 
     print(f"[*] Correlating alerts and computing explainable 0–100 risk scores...")
-    incidents = group_alerts_into_incidents(alerts)
-    user_profiles = compute_user_risk_profiles(incidents, baseline_repo, eval_events)
+    incidents = group_alerts_into_incidents(alerts, context_registry=context_reg)
+    user_profiles = compute_user_risk_profiles(incidents, baseline_repo, eval_events, context_registry=context_reg)
     print(f"    Formed {len(incidents)} security incidents.")
 
     # Console summary
@@ -100,6 +110,7 @@ def main() -> int:
     analyze_parser.add_argument("--evidence-csv-out", help="Path to write correlated evidence rows CSV")
     analyze_parser.add_argument("--user-csv-out", help="Path to write user risk profiles CSV")
     analyze_parser.add_argument("--date-format", help="Explicit date format if timestamps are ambiguous")
+    analyze_parser.add_argument("--context-config", help="Path to JSON file containing maintenance windows, authorized accounts, and VPN endpoints")
 
     # Subcommand: serve
     serve_parser = subparsers.add_parser("serve", help="Launch local investigator dashboard")
@@ -121,6 +132,7 @@ def main() -> int:
             evidence_csv_out=args.evidence_csv_out,
             user_csv_out=args.user_csv_out,
             date_format=args.date_format,
+            context_config=args.context_config,
         )
     elif args.command == "serve":
         from mission72.server import start_server

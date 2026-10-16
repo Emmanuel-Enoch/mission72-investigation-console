@@ -78,10 +78,12 @@ class DetectionEngine:
         baseline_repo: BaselineRepository,
         config: Optional[RuleConfig] = None,
         ip_location_map: Optional[Dict[str, Dict[str, str]]] = None,
+        context_registry: Optional[Any] = None,
     ) -> None:
         self.baseline_repo = baseline_repo
         self.config = config or RuleConfig()
         self.ip_location_map = ip_location_map or {}
+        self.context_registry = context_registry
 
     def _resolve_location(self, ip: str) -> Optional[str]:
         """Looks up location information if supplied in lookup data."""
@@ -339,8 +341,38 @@ class DetectionEngine:
                     continue
                 seen_unfamiliar.add(pair)
 
+                vpn_match = self.context_registry.match_vpn(norm_ip) if self.context_registry else None
                 loc_desc = self._resolve_location(norm_ip)
+                if not loc_desc and vpn_match:
+                    loc_desc = vpn_match.location
                 loc_text = f" (Geo-Location: {loc_desc})" if loc_desc else ""
+
+                is_verified_vpn = bool(vpn_match and vpn_match.is_trusted)
+                is_untrusted_vpn = bool(vpn_match and not vpn_match.is_trusted)
+
+                if is_verified_vpn:
+                    explanation = (
+                        f"User '{ev.username}' accessed system from unfamiliar IP {norm_ip}{loc_text} "
+                        f"via verified corporate VPN gateway '{vpn_match.name}'. "
+                        f"Location anomaly risk is mitigated by enterprise VPN evidence."
+                    )
+                    recommended_action = "Confirm employee remote travel status. VPN evidence verifies corporate gateway."
+                    severity = "LOW"
+                elif is_untrusted_vpn:
+                    explanation = (
+                        f"User '{ev.username}' accessed system from unfamiliar IP {norm_ip}{loc_text} "
+                        f"via unverified or untrusted VPN/proxy endpoint '{vpn_match.name}'. "
+                        f"Potential evasion or compromised proxy."
+                    )
+                    recommended_action = "Investigate untrusted VPN/proxy endpoint; verify user identity out-of-band."
+                    severity = "HIGH"
+                else:
+                    explanation = (
+                        f"User '{ev.username}' accessed system from IP {norm_ip}{loc_text}, "
+                        f"which was never observed in training history (known IPs: {', '.join(sorted(base.known_source_ips))})."
+                    )
+                    recommended_action = "Check IP reputation and geolocation; verify whether user connected via new VPN or ISP."
+                    severity = "HIGH" if loc_desc else self.config.unfamiliar_ip_severity
 
                 alerts.append(
                     Alert(
@@ -348,18 +380,21 @@ class DetectionEngine:
                         rule_id="RULE-05-UNFAMILIAR-IP",
                         rule_name="Authentication from Unfamiliar Source IP",
                         category="Network Anomaly",
-                        severity="HIGH" if loc_desc else self.config.unfamiliar_ip_severity,
+                        severity=severity,
                         username=ev.username,
                         timestamp_utc=ev.timestamp_utc,
                         source_ip=norm_ip,
                         destination_host=ev.destination_host,
-                        explanation=(
-                            f"User '{ev.username}' accessed system from IP {norm_ip}{loc_text}, "
-                            f"which was never observed in training history (known IPs: {', '.join(sorted(base.known_source_ips))})."
-                        ),
-                        recommended_action="Check IP reputation and geolocation; verify whether user connected via new VPN or ISP.",
+                        explanation=explanation,
+                        recommended_action=recommended_action,
                         evidence_events=[ev],
-                        metadata={"source_ip": norm_ip, "geo_location": loc_desc, "known_ips": sorted(base.known_source_ips)},
+                        metadata={
+                            "source_ip": norm_ip,
+                            "geo_location": loc_desc,
+                            "known_ips": sorted(base.known_source_ips),
+                            "vpn_verified": is_verified_vpn,
+                            "vpn_name": vpn_match.name if vpn_match else None,
+                        },
                     )
                 )
                 alert_idx += 1
@@ -404,24 +439,79 @@ class DetectionEngine:
                 is_sensitive = any("domain-controller" in h or "dc" in h or "admin" in h for h in unfam_hosts)
                 if len(unfam_hosts) >= self.config.unfamiliar_host_threshold or is_sensitive:
                     end_time = window_evs[-1].timestamp_utc
+
+                    # Context evaluation for maintenance windows and roles
+                    all_approved = False
+                    partial_approved = False
+                    active_window_ids = []
+                    mismatch_reasons = []
+
+                    if self.context_registry:
+                        approved_count = 0
+                        for e in window_evs:
+                            m_res = self.context_registry.evaluate_event_maintenance(e)
+                            if m_res.is_approved_maintenance:
+                                approved_count += 1
+                                if m_res.active_window_id and m_res.active_window_id not in active_window_ids:
+                                    active_window_ids.append(m_res.active_window_id)
+                            elif m_res.has_mismatch:
+                                mismatch_reasons.extend(m_res.mismatch_reasons)
+
+                        if approved_count == len(window_evs):
+                            all_approved = True
+                        elif approved_count > 0:
+                            partial_approved = True
+
+                    if all_approved:
+                        explanation = (
+                            f"User '{window_evs[0].username}' accessed unfamiliar destination host(s) "
+                            f"({', '.join(unfam_hosts)}) during approved maintenance window(s): {', '.join(active_window_ids)}."
+                        )
+                        recommended_action = "Routine maintenance activity. Verify scheduled change window closure."
+                        severity = "LOW"
+                    elif partial_approved:
+                        explanation = (
+                            f"User '{window_evs[0].username}' accessed unfamiliar destination host(s): {', '.join(unfam_hosts)}. "
+                            f"Partial maintenance match ({', '.join(active_window_ids)}), but unapproved access observed: {'; '.join(dict.fromkeys(mismatch_reasons))}."
+                        )
+                        recommended_action = "Investigate unapproved destination hosts accessed outside maintenance scope."
+                        severity = "HIGH" if is_sensitive else "MEDIUM"
+                    elif mismatch_reasons:
+                        explanation = (
+                            f"User '{window_evs[0].username}' accessed unfamiliar destination host(s): {', '.join(unfam_hosts)}. "
+                            f"Context Mismatch: {'; '.join(dict.fromkeys(mismatch_reasons))}."
+                        )
+                        recommended_action = "Investigate unauthorized lateral movement outside maintenance approval."
+                        severity = "HIGH" if is_sensitive else "MEDIUM"
+                    else:
+                        explanation = (
+                            f"User '{window_evs[0].username}' accessed unfamiliar destination host(s): "
+                            f"{', '.join(unfam_hosts)} (baseline hosts: {', '.join(sorted(base.known_destination_hosts))})."
+                        )
+                        recommended_action = "Investigate lateral movement risk; verify host access authorization."
+                        severity = "HIGH" if is_sensitive else "MEDIUM"
+
                     alerts.append(
                         Alert(
                             alert_id=f"ALT-R06-{alert_idx:04d}",
                             rule_id="RULE-06-UNFAMILIAR-HOSTS",
                             rule_name="Access to Unfamiliar Destination Host",
                             category="Lateral Movement Anomaly",
-                            severity="HIGH" if is_sensitive else "MEDIUM",
+                            severity=severity,
                             username=window_evs[0].username,
                             timestamp_utc=end_time,
                             source_ip=", ".join(sorted({e.source_ip for e in window_evs if e.source_ip})),
                             destination_host=", ".join(unfam_hosts),
-                            explanation=(
-                                f"User '{window_evs[0].username}' accessed unfamiliar destination host(s): "
-                                f"{', '.join(unfam_hosts)} (baseline hosts: {', '.join(sorted(base.known_destination_hosts))})."
-                            ),
-                            recommended_action="Investigate lateral movement risk; verify host access authorization.",
+                            explanation=explanation,
+                            recommended_action=recommended_action,
                             evidence_events=list(window_evs),
-                            metadata={"unfamiliar_hosts": unfam_hosts, "is_sensitive_target": is_sensitive},
+                            metadata={
+                                "unfamiliar_hosts": unfam_hosts,
+                                "is_sensitive_target": is_sensitive,
+                                "all_approved_maintenance": all_approved,
+                                "active_window_ids": active_window_ids,
+                                "mismatch_reasons": mismatch_reasons,
+                            },
                         )
                     )
                     alert_idx += 1

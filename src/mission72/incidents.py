@@ -66,6 +66,8 @@ class Incident:
     end_time_utc: datetime
     triage_summary: str
     recommended_action: str
+    context_status: str = "NORMAL_EVALUATION"
+    context_summary: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -85,6 +87,8 @@ class Incident:
             "end_time_utc": self.end_time_utc.isoformat(),
             "triage_summary": self.triage_summary,
             "recommended_action": self.recommended_action,
+            "context_status": self.context_status,
+            "context_summary": self.context_summary,
         }
 
 
@@ -103,6 +107,7 @@ class UserRiskProfile:
 def compute_incident_risk_score(
     alerts: List[Alert],
     evidence_events: List[AuthEvent],
+    context_registry: Optional[Any] = None,
 ) -> Tuple[int, str]:
     """
     Computes an explainable, deterministic risk score from 0 to 100 based on:
@@ -110,6 +115,7 @@ def compute_incident_risk_score(
     - Multi-category bonus (+10 for 2 categories, +20 for 3+ categories)
     - Evidence volume bonus (+5 for >5 events, +10 for >10 events)
     - Sensitive target bonus (+10 if high-value host is targeted)
+    - Contextual mitigation discount (up to -35 pts for verified maintenance or VPN)
     """
     if not alerts:
         return 0, "No alerts (Risk: 0)"
@@ -158,14 +164,25 @@ def compute_incident_risk_score(
             break
     sens_bonus = 10 if has_sensitive else 0
 
-    raw_total = base_score + cat_bonus + vol_bonus + sens_bonus
+    # 5. Contextual mitigation discount
+    context_discount = 0
+    context_note = ""
+    if context_registry:
+        c_res = context_registry.evaluate_incident_context(alerts, evidence_events)
+        context_discount = c_res.risk_discount_pts
+        if context_discount > 0:
+            context_note = f" | Context Mitigation (-{context_discount} pts: {'; '.join(c_res.explanations)})"
+        elif c_res.has_mismatch and c_res.mismatch_reasons:
+            context_note = f" | Context Audit (0 pts discount: {'; '.join(c_res.mismatch_reasons[:2])})"
+
+    raw_total = base_score + cat_bonus + vol_bonus + sens_bonus - context_discount
     clamped_score = max(0, min(100, raw_total))
 
     explanation = (
         f"Base Severity ({highest_sev}): {base_score} pts | "
         f"Multi-Category ({len(categories)} categories): +{cat_bonus} pts | "
         f"Evidence Volume ({ev_count} rows): +{vol_bonus} pts | "
-        f"Sensitive Asset Targeting: +{sens_bonus} pts "
+        f"Sensitive Asset Targeting: +{sens_bonus} pts{context_note} "
         f"-> Total Score: {clamped_score}/100"
     )
 
@@ -175,6 +192,7 @@ def compute_incident_risk_score(
 def group_alerts_into_incidents(
     alerts: List[Alert],
     clustering_window_seconds: int = 7200,  # 2 hours
+    context_registry: Optional[Any] = None,
 ) -> List[Incident]:
     """
     Groups alerts into coherent security incidents based on primary entity
@@ -268,7 +286,24 @@ def group_alerts_into_incidents(
                 end_time = max(end_time, all_evidence[-1].timestamp_utc)
 
             # Calculate explainable risk score
-            score, explanation = compute_incident_risk_score(cluster, all_evidence)
+            score, explanation = compute_incident_risk_score(cluster, all_evidence, context_registry=context_registry)
+
+            # Context status and summary
+            context_status = "NORMAL_EVALUATION"
+            context_summary = "Standard evaluation (no contextual mitigation active)."
+            if context_registry:
+                c_res = context_registry.evaluate_incident_context(cluster, all_evidence)
+                if c_res.is_approved_maintenance:
+                    context_status = "APPROVED_MAINTENANCE"
+                    context_summary = "; ".join(c_res.explanations)
+                elif c_res.is_vpn_verified:
+                    context_status = "VERIFIED_VPN"
+                    context_summary = "; ".join(c_res.explanations)
+                elif c_res.has_mismatch:
+                    context_status = "APPROVAL_MISMATCH"
+                    context_summary = "; ".join(c_res.mismatch_reasons)
+                elif c_res.explanations:
+                    context_summary = "; ".join(c_res.explanations)
 
             # Construct readable title & entity
             if entity_key.startswith("SOURCE-IP:"):
@@ -308,6 +343,8 @@ def group_alerts_into_incidents(
                     end_time_utc=end_time,
                     triage_summary=triage_summary,
                     recommended_action=recommended_action,
+                    context_status=context_status,
+                    context_summary=context_summary,
                 )
             )
             inc_idx += 1
@@ -321,6 +358,7 @@ def compute_user_risk_profiles(
     incidents: List[Incident],
     baseline_repo: BaselineRepository,
     all_events: Optional[List[AuthEvent]] = None,
+    context_registry: Optional[Any] = None,
 ) -> List[UserRiskProfile]:
     """
     Computes consolidated per-user risk scores (0–100) across all incidents.

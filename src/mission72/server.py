@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from mission72.baseline import build_user_baselines
+from mission72.context import ContextRegistry, create_default_context_registry
 from mission72.detections import DetectionEngine, RuleConfig
 from mission72.incidents import (
     compute_user_risk_profiles,
@@ -28,6 +29,16 @@ from mission72.reporting import (
     export_user_risk_to_csv,
     generate_html_report,
 )
+
+
+def get_active_context_registry() -> ContextRegistry:
+    cfg_path = Path("config/context_config.json")
+    if cfg_path.exists():
+        try:
+            return ContextRegistry.from_file(cfg_path)
+        except Exception:
+            pass
+    return create_default_context_registry()
 
 
 class InvestigatorState:
@@ -280,6 +291,21 @@ SERVER_HTML = """<!DOCTYPE html>
             background: #152a1e; color: #3fb950; border: 1px solid #1f4030;
             display: inline-block; margin-right: 4px; margin-bottom: 4px;
         }
+        .badge-context-approved {
+            font-size: 11px; padding: 2px 8px; border-radius: 4px;
+            background: #152a1e; color: #3fb950; border: 1px solid #1f4030;
+            display: inline-block; font-weight: 600;
+        }
+        .badge-context-vpn {
+            font-size: 11px; padding: 2px 8px; border-radius: 4px;
+            background: #1e2a4a; color: #7da3f5; border: 1px solid #2d4070;
+            display: inline-block; font-weight: 600;
+        }
+        .badge-context-mismatch {
+            font-size: 11px; padding: 2px 8px; border-radius: 4px;
+            background: #3d1c1c; color: #f85149; border: 1px solid #5a2424;
+            display: inline-block; font-weight: 600;
+        }
         .action-box {
             background: var(--surface); border: 1px solid var(--border);
             border-left: 3px solid var(--accent);
@@ -483,6 +509,11 @@ SERVER_HTML = """<!DOCTYPE html>
             <div class="panel-section">
                 <div class="panel-section-title">Categories</div>
                 <div id="p-cats"></div>
+            </div>
+            <div class="panel-section" id="p-context-sec">
+                <div class="panel-section-title">Context Policy Status</div>
+                <div id="p-context-badge"></div>
+                <div id="p-context-summary" style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4"></div>
             </div>
             <div class="panel-section">
                 <div class="panel-section-title">Recommended Action</div>
@@ -738,6 +769,27 @@ function openPanel(id) {
         catsEl.appendChild(sp);
     });
 
+    /* Context policy status */
+    var ctxBadge = document.getElementById('p-context-badge');
+    var ctxSummary = document.getElementById('p-context-summary');
+    if (ctxBadge && ctxSummary) {
+        ctxBadge.innerHTML = '';
+        ctxSummary.textContent = inc.context_summary || 'Standard baseline evaluation (no policy override).';
+        var status = inc.context_status || 'NONE';
+        var sp = document.createElement('span');
+        if (status.indexOf('APPROVED') !== -1) {
+            sp.className = 'badge-context-approved';
+        } else if (status.indexOf('VPN') !== -1) {
+            sp.className = 'badge-context-vpn';
+        } else if (status.indexOf('MISMATCH') !== -1) {
+            sp.className = 'badge-context-mismatch';
+        } else {
+            sp.className = 'badge-rule';
+        }
+        sp.textContent = status;
+        ctxBadge.appendChild(sp);
+    }
+
     setText('p-action',      inc.recommended_action);
     setText('p-explanation', inc.risk_explanation);
 
@@ -905,6 +957,8 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
                 "end":                inc.end_time_utc.strftime("%H:%M") + " UTC",
                 "categories":         inc.categories,
                 "rule_ids":           inc.rule_ids,
+                "context_status":     getattr(inc, "context_status", "NONE"),
+                "context_summary":    getattr(inc, "context_summary", ""),
                 "recommended_action": inc.recommended_action,
                 "risk_explanation":   inc.risk_explanation,
                 "evidence": [
@@ -956,10 +1010,11 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
             eval_events, q_rep = parse_csv_stream(f, source_file=str(eval_path))
 
         repo = build_user_baselines(train_events, min_training_events=5)
-        engine = DetectionEngine(baseline_repo=repo)
+        context_reg = get_active_context_registry()
+        engine = DetectionEngine(baseline_repo=repo, context_registry=context_reg)
         alerts = engine.run_all(eval_events)
-        incidents = group_alerts_into_incidents(alerts)
-        user_profiles = compute_user_risk_profiles(incidents, repo, eval_events)
+        incidents = group_alerts_into_incidents(alerts, context_registry=context_reg)
+        user_profiles = compute_user_risk_profiles(incidents, repo, eval_events, context_registry=context_reg)
 
         GLOBAL_STATE.incidents = incidents
         GLOBAL_STATE.user_profiles = user_profiles
@@ -1000,10 +1055,11 @@ class InvestigatorRequestHandler(BaseHTTPRequestHandler):
         eval_events, q_rep = parse_csv_stream(io.StringIO(eval_content), source_file=eval_filename)
 
         repo = build_user_baselines(train_events, min_training_events=5)
-        engine = DetectionEngine(baseline_repo=repo)
+        context_reg = get_active_context_registry()
+        engine = DetectionEngine(baseline_repo=repo, context_registry=context_reg)
         alerts = engine.run_all(eval_events)
-        incidents = group_alerts_into_incidents(alerts)
-        user_profiles = compute_user_risk_profiles(incidents, repo, eval_events)
+        incidents = group_alerts_into_incidents(alerts, context_registry=context_reg)
+        user_profiles = compute_user_risk_profiles(incidents, repo, eval_events, context_registry=context_reg)
 
         GLOBAL_STATE.incidents = incidents
         GLOBAL_STATE.user_profiles = user_profiles

@@ -1,0 +1,16 @@
+username,risk_score,baseline_status,incident_count,highest_severity,rules_triggered,score_rationale
+dana.scully,100,ESTABLISHED,7,CRITICAL,RULE-01-REPEATED-FAILURES; RULE-02-BURST-THEN-SUCCESS; RULE-04-UNUSUAL-TIME; RULE-05-UNFAMILIAR-IP,"Highest incident score: 100 | Multi-incident bonus (7 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP -> Final Score: 100/100"
+charlie.davis,90,ESTABLISHED,10,HIGH,RULE-01-REPEATED-FAILURES; RULE-05-UNFAMILIAR-IP,"Highest incident score: 75 | Multi-incident bonus (10 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP -> Final Score: 90/100"
+alice.smith,70,ESTABLISHED,2,HIGH,RULE-04-UNUSUAL-TIME; RULE-06-UNFAMILIAR-HOSTS,"Highest incident score: 65 | Multi-incident bonus (2 incidents): +5 | Rules triggered: RULE-04-UNUSUAL-TIME, RULE-06-UNFAMILIAR-HOSTS -> Final Score: 70/100"
+user01,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+svc_backup,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+admin,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+user06,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+helpdesk,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+user03,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+user05,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+user02,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+user07,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+user04,65,UNAVAILABLE,1,HIGH,RULE-03-PASSWORD-SPRAY,Highest incident score: 65 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -> Final Score: 65/100
+bob.jones,35,ESTABLISHED,1,MEDIUM,RULE-05-UNFAMILIAR-IP,Highest incident score: 35 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-05-UNFAMILIAR-IP -> Final Score: 35/100
+edward.norton,0,INSUFFICIENT_DATA,0,NONE,,No suspicious alerts or anomalies detected (Risk: 0/100).
