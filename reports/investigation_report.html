@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission 72 — Investigation &amp; Activity Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --primary: #38bdf8;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.5;
+            padding: 24px;
+        }
+        .header { margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; }
+        .header h1 { font-size: 24px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .header p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .metric-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .metric-value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+
+        .filter-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 4px; }
+        .filter-group label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+        .filter-group input, .filter-group select {
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        .incident-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .incident-id { font-size: 12px; color: var(--text-muted); font-family: monospace; }
+        .incident-title { font-size: 18px; font-weight: 600; color: #fff; margin-top: 4px; }
+        .score-box {
+            border: 2px solid;
+            border-radius: 8px;
+            padding: 6px 12px;
+            text-align: center;
+            min-width: 90px;
+        }
+        .score-val { font-size: 22px; font-weight: 800; display: block; line-height: 1; }
+        .score-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; }
+
+        .card-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            background: #0f172a80;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        .card-explanation, .card-action {
+            font-size: 13px;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        .card-explanation { background: #1e293b; border-left: 3px solid var(--primary); }
+        .card-action { background: #0f172a; border-left: 3px solid var(--warning); }
+
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        .badge-critical { background: #7f1d1d; color: #fca5a5; }
+        .badge-high { background: #831843; color: #fbcfe8; }
+        .badge-medium { background: #78350f; color: #fde68a; }
+        .badge-low { background: #064e3b; color: #a7f3d0; }
+        .badge-rule { background: #312e81; color: #c7d2fe; margin-right: 4px; }
+        .badge-cat { background: #1e1b4b; color: #e0e7ff; margin-right: 4px; }
+        .badge-success { background: #065f46; color: #a7f3d0; }
+        .badge-failure { background: #991b1b; color: #fecaca; }
+        .badge-status { background: #334155; color: #cbd5e1; }
+        .badge-normal { background: #064e3b; color: #6ee7b7; }
+
+        details.evidence-details { margin-top: 12px; }
+        details.evidence-details summary {
+            cursor: pointer;
+            color: var(--primary);
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 0;
+        }
+        .table-container { overflow-x: auto; margin-top: 8px; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+        }
+        th, td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        th { background: #0f172a; color: var(--text-muted); font-weight: 600; }
+        tr:hover td { background: #1e293b80; }
+        code { font-family: monospace; font-size: 11px; }
+        .small-text { font-size: 11px; color: var(--text-muted); }
+        .empty-state { padding: 32px; text-align: center; color: var(--text-muted); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Mission 72 — Investigation &amp; Activity Dashboard</h1>
+        <p>Offline Authentication Log Security Audit & Incident Timeline | Generated Locally</p>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-title">Total Incidents</div>
+            <div class="metric-value" style="color: var(--primary)">6</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Critical / High</div>
+            <div class="metric-value" style="color: var(--danger)">4</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Max Risk Score</div>
+            <div class="metric-value" style="color: #ef4444">100 / 100</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Correlated Evidence</div>
+            <div class="metric-value" style="color: #cbd5e1">30 rows</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-title">Data Ingestion</div>
+            <div class="metric-value" style="color: #f59e0b">
+                38 / 40
+            </div>
+        </div>
+    </div>
+
+    <div class="filter-panel">
+        <div class="filter-group">
+            <label for="filter-entity">Filter by Entity / User</label>
+            <input type="text" id="filter-entity" placeholder="e.g. alice, charlie, IP..." oninput="applyFilters()">
+        </div>
+        <div class="filter-group">
+            <label for="filter-severity">Severity</label>
+            <select id="filter-severity" onchange="applyFilters()">
+                <option value="ALL">All Severities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="filter-min-score">Minimum Risk Score</label>
+            <input type="number" id="filter-min-score" min="0" max="100" value="0" oninput="applyFilters()" style="width: 80px;">
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('incidents-tab', this)">Security Incidents (6)</button>
+        <button class="tab-btn" onclick="switchTab('users-tab', this)">Per-User Risk Profiles (15)</button>
+        <button class="tab-btn" onclick="switchTab('quality-tab', this)">Data Quality Audit</button>
+    </div>
+
+    <div id="incidents-tab" class="tab-content">
+        <div id="incidents-container">
+            
+        <div class="incident-card" data-severity="CRITICAL" data-entity="dana.scully" data-score="100">
+            <div class="card-header">
+                <div>
+                    <span class="badge badge-critical">CRITICAL</span>
+                    <span class="incident-id">INC-0004</span>
+                    <h3 class="incident-title">Suspicious Activity on Account &#x27;dana.scully&#x27; (RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP)</h3>
+                </div>
+                <div class="score-box" style="border-color: #dc2626; color: #dc2626">
+                    <span class="score-val">100</span>
+                    <span class="score-label">RISK SCORE</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <div><strong>Primary Entity:</strong> <code>dana.scully</code></div>
+                <div><strong>Time Window:</strong> 2026-10-12 18:00:00 to 18:02:20 UTC</div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-01-REPEATED-FAILURES</span><span class="badge badge-rule">RULE-02-BURST-THEN-SUCCESS</span><span class="badge badge-rule">RULE-04-UNUSUAL-TIME</span><span class="badge badge-rule">RULE-05-UNFAMILIAR-IP</span></div>
+                <div><strong>Categories:</strong> <span class="badge badge-cat">Authentication Anomaly</span><span class="badge badge-cat">Behavioral Anomaly</span><span class="badge badge-cat">Credential Compromise</span><span class="badge badge-cat">Network Anomaly</span></div>
+            </div>
+            <div class="card-explanation">
+                <strong>Score Derivation:</strong> Base Severity (CRITICAL): 75 pts | Multi-Category (4 categories): +20 pts | Evidence Volume (7 rows): +5 pts | Sensitive Asset Targeting: +10 pts -&gt; Total Score: 100/100
+            </div>
+            <div class="card-action">
+                <strong>Recommended Triage:</strong> Verify with user if off-hours activity was expected or scheduled. | Check IP reputation and geolocation; verify whether user connected via new VPN or ISP. | Inspect source IPs for brute-force origins; verify if account lockout was triggered. | High priority: Contact user immediately to verify legitimacy; consider revoking active session tokens.
+            </div>
+            <details class="evidence-details">
+                <summary>View Correlated Evidence Rows (7 events)</summary>
+                <div class="table-container">
+                    <table class="evidence-table">
+                        <thead>
+                            <tr>
+                                <th>Source : Line</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>User</th>
+                                <th>Source IP</th>
+                                <th>Destination Host</th>
+                                <th>Event Type</th>
+                                <th>Result</th>
+                                <th>Logon Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>synthetic_evaluation_auth.csv:17</code></td><td>2026-10-12T18:00:00+00:00</td><td><strong>dana.scully</strong></td><td><code>198.51.100.42</code></td><td><code>sec-ops-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>RemoteInteractive</td></tr><tr><td><code>synthetic_evaluation_auth.csv:18</code></td><td>2026-10-12T18:00:20+00:00</td><td><strong>dana.scully</strong></td><td><code>198.51.100.42</code></td><td><code>sec-ops-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>RemoteInteractive</td></tr><tr><td><code>synthetic_evaluation_auth.csv:19</code></td><td>2026-10-12T18:00:40+00:00</td><td><strong>dana.scully</strong></td><td><code>198.51.100.42</code></td><td><code>sec-ops-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>RemoteInteractive</td></tr><tr><td><code>synthetic_evaluation_auth.csv:20</code></td><td>2026-10-12T18:01:00+00:00</td><td><strong>dana.scully</strong></td><td><code>198.51.100.42</code></td><td><code>sec-ops-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>RemoteInteractive</td></tr><tr><td><code>synthetic_evaluation_auth.csv:21</code></td><td>2026-10-12T18:01:20+00:00</td><td><strong>dana.scully</strong></td><td><code>198.51.100.42</code></td><td><code>sec-ops-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>RemoteInteractive</td></tr><tr><td><code>synthetic_evaluation_auth.csv:22</code></td><td>2026-10-12T18:01:40+00:00</td><td><strong>dana.scully</strong></td><td><code>198.51.100.42</code></td><td><code>sec-ops-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>RemoteInteractive</td></tr><tr><td><code>synthetic_evaluation_auth.csv:23</code></td><td>2026-10-12T18:02:20+00:00</td><td><strong>dana.scully</strong></td><td><code>198.51.100.42</code></td><td><code>sec-ops-01</code></td><td>Logon</td><td><span class="badge badge-success">SUCCESS</span></td><td>RemoteInteractive</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+        
+
+        <div class="incident-card" data-severity="HIGH" data-entity="external ip 203.0.113.88" data-score="75">
+            <div class="card-header">
+                <div>
+                    <span class="badge badge-high">HIGH</span>
+                    <span class="incident-id">INC-0005</span>
+                    <h3 class="incident-title">Password Spray Campaign from 203.0.113.88</h3>
+                </div>
+                <div class="score-box" style="border-color: #dc2626; color: #dc2626">
+                    <span class="score-val">75</span>
+                    <span class="score-label">RISK SCORE</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <div><strong>Primary Entity:</strong> <code>External IP 203.0.113.88</code></div>
+                <div><strong>Time Window:</strong> 2026-10-13 11:00:00 to 11:04:30 UTC</div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-03-PASSWORD-SPRAY</span></div>
+                <div><strong>Categories:</strong> <span class="badge badge-cat">Credential Access</span></div>
+            </div>
+            <div class="card-explanation">
+                <strong>Score Derivation:</strong> Base Severity (HIGH): 55 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (10 rows): +10 pts | Sensitive Asset Targeting: +10 pts -&gt; Total Score: 75/100
+            </div>
+            <div class="card-action">
+                <strong>Recommended Triage:</strong> Block offending source IP at edge firewall; check for successful logins from this IP.
+            </div>
+            <details class="evidence-details">
+                <summary>View Correlated Evidence Rows (10 events)</summary>
+                <div class="table-container">
+                    <table class="evidence-table">
+                        <thead>
+                            <tr>
+                                <th>Source : Line</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>User</th>
+                                <th>Source IP</th>
+                                <th>Destination Host</th>
+                                <th>Event Type</th>
+                                <th>Result</th>
+                                <th>Logon Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>synthetic_evaluation_auth.csv:26</code></td><td>2026-10-13T11:00:00+00:00</td><td><strong>svc_backup</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:27</code></td><td>2026-10-13T11:00:30+00:00</td><td><strong>admin</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:28</code></td><td>2026-10-13T11:01:00+00:00</td><td><strong>helpdesk</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:29</code></td><td>2026-10-13T11:01:30+00:00</td><td><strong>user01</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:30</code></td><td>2026-10-13T11:02:00+00:00</td><td><strong>user02</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:31</code></td><td>2026-10-13T11:02:30+00:00</td><td><strong>user03</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:32</code></td><td>2026-10-13T11:03:00+00:00</td><td><strong>user04</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:33</code></td><td>2026-10-13T11:03:30+00:00</td><td><strong>user05</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:34</code></td><td>2026-10-13T11:04:00+00:00</td><td><strong>user06</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:35</code></td><td>2026-10-13T11:04:30+00:00</td><td><strong>user07</strong></td><td><code>203.0.113.88</code></td><td><code>mail-gateway</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+        
+
+        <div class="incident-card" data-severity="HIGH" data-entity="charlie.davis" data-score="75">
+            <div class="card-header">
+                <div>
+                    <span class="badge badge-high">HIGH</span>
+                    <span class="incident-id">INC-0003</span>
+                    <h3 class="incident-title">Suspicious Activity on Account &#x27;charlie.davis&#x27; (RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP)</h3>
+                </div>
+                <div class="score-box" style="border-color: #dc2626; color: #dc2626">
+                    <span class="score-val">75</span>
+                    <span class="score-label">RISK SCORE</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <div><strong>Primary Entity:</strong> <code>charlie.davis</code></div>
+                <div><strong>Time Window:</strong> 2026-10-11 14:00:00 to 14:02:15 UTC</div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-01-REPEATED-FAILURES</span><span class="badge badge-rule">RULE-05-UNFAMILIAR-IP</span></div>
+                <div><strong>Categories:</strong> <span class="badge badge-cat">Authentication Anomaly</span><span class="badge badge-cat">Network Anomaly</span></div>
+            </div>
+            <div class="card-explanation">
+                <strong>Score Derivation:</strong> Base Severity (HIGH): 55 pts | Multi-Category (2 categories): +10 pts | Evidence Volume (10 rows): +10 pts | Sensitive Asset Targeting: +0 pts -&gt; Total Score: 75/100
+            </div>
+            <div class="card-action">
+                <strong>Recommended Triage:</strong> Check IP reputation and geolocation; verify whether user connected via new VPN or ISP. | Inspect source IPs for brute-force origins; verify if account lockout was triggered.
+            </div>
+            <details class="evidence-details">
+                <summary>View Correlated Evidence Rows (10 events)</summary>
+                <div class="table-container">
+                    <table class="evidence-table">
+                        <thead>
+                            <tr>
+                                <th>Source : Line</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>User</th>
+                                <th>Source IP</th>
+                                <th>Destination Host</th>
+                                <th>Event Type</th>
+                                <th>Result</th>
+                                <th>Logon Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>synthetic_evaluation_auth.csv:5</code></td><td>2026-10-11T14:00:00+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:6</code></td><td>2026-10-11T14:00:15+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:7</code></td><td>2026-10-11T14:00:30+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:8</code></td><td>2026-10-11T14:00:45+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:9</code></td><td>2026-10-11T14:01:00+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:10</code></td><td>2026-10-11T14:01:15+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:11</code></td><td>2026-10-11T14:01:30+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:12</code></td><td>2026-10-11T14:01:45+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:13</code></td><td>2026-10-11T14:02:00+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr><tr><td><code>synthetic_evaluation_auth.csv:14</code></td><td>2026-10-11T14:02:15+00:00</td><td><strong>charlie.davis</strong></td><td><code>198.51.100.25</code></td><td><code>app-server-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+        
+
+        <div class="incident-card" data-severity="HIGH" data-entity="alice.smith" data-score="65">
+            <div class="card-header">
+                <div>
+                    <span class="badge badge-high">HIGH</span>
+                    <span class="incident-id">INC-0002</span>
+                    <h3 class="incident-title">Suspicious Activity on Account &#x27;alice.smith&#x27; (RULE-06-UNFAMILIAR-HOSTS)</h3>
+                </div>
+                <div class="score-box" style="border-color: #f59e0b; color: #f59e0b">
+                    <span class="score-val">65</span>
+                    <span class="score-label">RISK SCORE</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <div><strong>Primary Entity:</strong> <code>alice.smith</code></div>
+                <div><strong>Time Window:</strong> 2026-10-14 15:20:00 to 15:20:00 UTC</div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-06-UNFAMILIAR-HOSTS</span></div>
+                <div><strong>Categories:</strong> <span class="badge badge-cat">Lateral Movement Anomaly</span></div>
+            </div>
+            <div class="card-explanation">
+                <strong>Score Derivation:</strong> Base Severity (HIGH): 55 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (1 rows): +0 pts | Sensitive Asset Targeting: +10 pts -&gt; Total Score: 65/100
+            </div>
+            <div class="card-action">
+                <strong>Recommended Triage:</strong> Investigate lateral movement risk; verify host access authorization.
+            </div>
+            <details class="evidence-details">
+                <summary>View Correlated Evidence Rows (1 events)</summary>
+                <div class="table-container">
+                    <table class="evidence-table">
+                        <thead>
+                            <tr>
+                                <th>Source : Line</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>User</th>
+                                <th>Source IP</th>
+                                <th>Destination Host</th>
+                                <th>Event Type</th>
+                                <th>Result</th>
+                                <th>Logon Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>synthetic_evaluation_auth.csv:37</code></td><td>2026-10-14T15:20:00+00:00</td><td><strong>alice.smith</strong></td><td><code>192.168.1.50</code></td><td><code>domain-controller-01</code></td><td>Logon</td><td><span class="badge badge-failure">FAILURE</span></td><td>Network</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+        
+
+        <div class="incident-card" data-severity="MEDIUM" data-entity="bob.jones" data-score="35">
+            <div class="card-header">
+                <div>
+                    <span class="badge badge-medium">MEDIUM</span>
+                    <span class="incident-id">INC-0006</span>
+                    <h3 class="incident-title">Suspicious Activity on Account &#x27;bob.jones&#x27; (RULE-05-UNFAMILIAR-IP)</h3>
+                </div>
+                <div class="score-box" style="border-color: #10b981; color: #10b981">
+                    <span class="score-val">35</span>
+                    <span class="score-label">RISK SCORE</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <div><strong>Primary Entity:</strong> <code>bob.jones</code></div>
+                <div><strong>Time Window:</strong> 2026-10-14 13:45:00 to 13:45:00 UTC</div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-05-UNFAMILIAR-IP</span></div>
+                <div><strong>Categories:</strong> <span class="badge badge-cat">Network Anomaly</span></div>
+            </div>
+            <div class="card-explanation">
+                <strong>Score Derivation:</strong> Base Severity (MEDIUM): 35 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (1 rows): +0 pts | Sensitive Asset Targeting: +0 pts -&gt; Total Score: 35/100
+            </div>
+            <div class="card-action">
+                <strong>Recommended Triage:</strong> Check IP reputation and geolocation; verify whether user connected via new VPN or ISP.
+            </div>
+            <details class="evidence-details">
+                <summary>View Correlated Evidence Rows (1 events)</summary>
+                <div class="table-container">
+                    <table class="evidence-table">
+                        <thead>
+                            <tr>
+                                <th>Source : Line</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>User</th>
+                                <th>Source IP</th>
+                                <th>Destination Host</th>
+                                <th>Event Type</th>
+                                <th>Result</th>
+                                <th>Logon Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>synthetic_evaluation_auth.csv:36</code></td><td>2026-10-14T13:45:00+00:00</td><td><strong>bob.jones</strong></td><td><code>185.220.101.5</code></td><td><code>corp-workstation-02</code></td><td>Logon</td><td><span class="badge badge-success">SUCCESS</span></td><td>Interactive</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+        
+
+        <div class="incident-card" data-severity="MEDIUM" data-entity="alice.smith" data-score="35">
+            <div class="card-header">
+                <div>
+                    <span class="badge badge-medium">MEDIUM</span>
+                    <span class="incident-id">INC-0001</span>
+                    <h3 class="incident-title">Suspicious Activity on Account &#x27;alice.smith&#x27; (RULE-04-UNUSUAL-TIME)</h3>
+                </div>
+                <div class="score-box" style="border-color: #10b981; color: #10b981">
+                    <span class="score-val">35</span>
+                    <span class="score-label">RISK SCORE</span>
+                </div>
+            </div>
+            <div class="card-meta">
+                <div><strong>Primary Entity:</strong> <code>alice.smith</code></div>
+                <div><strong>Time Window:</strong> 2026-10-11 03:15:00 to 03:15:00 UTC</div>
+                <div><strong>Rules:</strong> <span class="badge badge-rule">RULE-04-UNUSUAL-TIME</span></div>
+                <div><strong>Categories:</strong> <span class="badge badge-cat">Behavioral Anomaly</span></div>
+            </div>
+            <div class="card-explanation">
+                <strong>Score Derivation:</strong> Base Severity (MEDIUM): 35 pts | Multi-Category (1 categories): +0 pts | Evidence Volume (1 rows): +0 pts | Sensitive Asset Targeting: +0 pts -&gt; Total Score: 35/100
+            </div>
+            <div class="card-action">
+                <strong>Recommended Triage:</strong> Verify with user if off-hours activity was expected or scheduled.
+            </div>
+            <details class="evidence-details">
+                <summary>View Correlated Evidence Rows (1 events)</summary>
+                <div class="table-container">
+                    <table class="evidence-table">
+                        <thead>
+                            <tr>
+                                <th>Source : Line</th>
+                                <th>Timestamp (UTC)</th>
+                                <th>User</th>
+                                <th>Source IP</th>
+                                <th>Destination Host</th>
+                                <th>Event Type</th>
+                                <th>Result</th>
+                                <th>Logon Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>synthetic_evaluation_auth.csv:2</code></td><td>2026-10-11T03:15:00+00:00</td><td><strong>alice.smith</strong></td><td><code>192.168.1.50</code></td><td><code>corp-workstation-01</code></td><td>Logon</td><td><span class="badge badge-success">SUCCESS</span></td><td>Interactive</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
+        
+        </div>
+    </div>
+
+    <div id="users-tab" class="tab-content" style="display: none;">
+        <div class="metric-card">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User Account</th>
+                            <th>Risk Score (0–100)</th>
+                            <th>Baseline Status</th>
+                            <th>Incidents</th>
+                            <th>Highest Severity</th>
+                            <th>Rules Triggered</th>
+                            <th>Score Rationale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>dana.scully</strong></td><td><span style='color: #dc2626; font-weight: bold;'>100 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>7</td><td><span class="badge badge-critical">CRITICAL</span></td><td><code>RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 100 | Multi-incident bonus (7 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-02-BURST-THEN-SUCCESS, RULE-04-UNUSUAL-TIME, RULE-05-UNFAMILIAR-IP -&gt; Final Score: 100/100</td></tr><tr><td><strong>charlie.davis</strong></td><td><span style='color: #dc2626; font-weight: bold;'>90 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>10</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (10 incidents): +15 | Rules triggered: RULE-01-REPEATED-FAILURES, RULE-05-UNFAMILIAR-IP -&gt; Final Score: 90/100</td></tr><tr><td><strong>user06</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user07</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user04</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>admin</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>svc_backup</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user03</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user01</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>helpdesk</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user02</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>user05</strong></td><td><span style='color: #dc2626; font-weight: bold;'>75 / 100</span></td><td><span class='badge badge-status'>UNAVAILABLE</span></td><td>1</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-03-PASSWORD-SPRAY</code></td><td class='small-text'>Highest incident score: 75 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-03-PASSWORD-SPRAY -&gt; Final Score: 75/100</td></tr><tr><td><strong>alice.smith</strong></td><td><span style='color: #dc2626; font-weight: bold;'>70 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>2</td><td><span class="badge badge-high">HIGH</span></td><td><code>RULE-04-UNUSUAL-TIME, RULE-06-UNFAMILIAR-HOSTS</code></td><td class='small-text'>Highest incident score: 65 | Multi-incident bonus (2 incidents): +5 | Rules triggered: RULE-04-UNUSUAL-TIME, RULE-06-UNFAMILIAR-HOSTS -&gt; Final Score: 70/100</td></tr><tr><td><strong>bob.jones</strong></td><td><span style='color: #10b981; font-weight: bold;'>35 / 100</span></td><td><span class='badge badge-status'>ESTABLISHED</span></td><td>1</td><td><span class="badge badge-medium">MEDIUM</span></td><td><code>RULE-05-UNFAMILIAR-IP</code></td><td class='small-text'>Highest incident score: 35 | Multi-incident bonus (1 incidents): +0 | Rules triggered: RULE-05-UNFAMILIAR-IP -&gt; Final Score: 35/100</td></tr><tr><td><strong>edward.norton</strong></td><td><span style='color: #10b981; font-weight: bold;'>0 / 100</span></td><td><span class='badge badge-status'>INSUFFICIENT_DATA</span></td><td>0</td><td><span class="badge badge-normal">CLEAN</span></td><td><code>None</code></td><td class='small-text'>No suspicious alerts or anomalies detected (Risk: 0/100).</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="quality-tab" class="tab-content" style="display: none;">
+        <div class="metric-card">
+            <h3 style="margin-bottom: 12px; color: var(--primary);">Ingestion Quality & Provenance Summary</h3>
+            <p style="margin-bottom: 8px;"><strong>Total Raw Records Read:</strong> 40</p>
+            <p style="margin-bottom: 8px;"><strong>Valid Records Normalized:</strong> 38</p>
+            <p style="margin-bottom: 8px;"><strong>Malformed / Corrupted Records:</strong> 2</p>
+            <p style="margin-bottom: 8px;"><strong>Missing Header Columns:</strong> []</p>
+            <p style="margin-bottom: 8px;"><strong>Candidate Duplicate Rows Flagged:</strong> 1</p>
+            <p style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">
+                * Note: In compliance with cybersecurity audit rules, malformed and duplicate candidate rows are preserved for forensic completeness and are never silently discarded.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).style.display = 'block';
+            btn.classList.add('active');
+        }
+
+        function applyFilters() {
+            const entityQuery = document.getElementById('filter-entity').value.toLowerCase().trim();
+            const severityFilter = document.getElementById('filter-severity').value;
+            const minScore = parseInt(document.getElementById('filter-min-score').value, 10) || 0;
+
+            const cards = document.querySelectorAll('.incident-card');
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                const entity = card.getAttribute('data-entity') || '';
+                const severity = card.getAttribute('data-severity') || '';
+                const score = parseInt(card.getAttribute('data-score'), 10) || 0;
+
+                const matchEntity = !entityQuery || entity.includes(entityQuery);
+                const matchSeverity = severityFilter === 'ALL' || severity === severityFilter;
+                const matchScore = score >= minScore;
+
+                if (matchEntity && matchSeverity && matchScore) {
+                    card.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
